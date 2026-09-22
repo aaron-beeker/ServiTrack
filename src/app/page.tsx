@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Card,
   CardContent,
@@ -15,11 +19,36 @@ import {
   LayoutDashboard,
   Users,
   Box,
-  Settings
+  Settings,
+  ChevronRight
 } from "lucide-react"
 import { TicketModal } from "@/components/tickets/TicketModal"
+import { getRecentTickets } from "@/services/ticketService"
+import { Ticket } from "@/types"
 
 export default function Dashboard() {
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        const data = await getRecentTickets(20)
+        setTickets(data)
+      } catch (err) {
+        console.error("Error cargando tickets", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchTickets()
+  }, [])
+
+  const pendientes = tickets.filter(t => t.estado === 'RECEPCIONADO').length
+  const diagnostico = tickets.filter(t => t.estado === 'EN_DIAGNOSTICO' || t.estado === 'DIAGNOSTICADO' || t.estado === 'PENDIENTE_APROBACION').length
+  const reparacion = tickets.filter(t => t.estado === 'EN_REPARACION' || t.estado === 'CONTROL_CALIDAD').length
+  const entregados = tickets.filter(t => t.estado === 'ENTREGADO').length
   return (
     <div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden font-sans">
       
@@ -36,14 +65,14 @@ export default function Dashboard() {
         </div>
 
         <nav className="flex-1 space-y-2">
-          <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active />
-          <NavItem icon={<Wrench size={18} />} label="Tickets" />
-          <NavItem icon={<Users size={18} />} label="Clientes" />
-          <NavItem icon={<Box size={18} />} label="Inventario" />
+          <NavItem href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active />
+          <NavItem href="/tickets" icon={<Wrench size={18} />} label="Tickets" />
+          <NavItem href="/clientes" icon={<Users size={18} />} label="Clientes" />
+          <NavItem href="/inventario" icon={<Box size={18} />} label="Inventario" />
         </nav>
 
         <div className="mt-auto">
-          <NavItem icon={<Settings size={18} />} label="Configuración" />
+          <NavItem href="/configuracion" icon={<Settings size={18} />} label="Configuración" />
         </div>
       </aside>
 
@@ -80,54 +109,89 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard 
               title="Tickets Pendientes" 
-              value="24" 
+              value={pendientes.toString()} 
               icon={<Clock className="w-5 h-5 text-amber-400" />} 
-              trend="+3 hoy"
+              trend="Esperando revisión"
               trendUp={true}
               borderColor="border-amber-500/20"
               bgColor="bg-amber-500/5"
             />
             <StatCard 
               title="En Diagnóstico" 
-              value="12" 
+              value={diagnostico.toString()} 
               icon={<AlertCircle className="w-5 h-5 text-blue-400" />} 
-              trend="Normal"
+              trend="Evaluación técnica"
               borderColor="border-blue-500/20"
               bgColor="bg-blue-500/5"
             />
             <StatCard 
               title="En Reparación" 
-              value="8" 
+              value={reparacion.toString()} 
               icon={<Wrench className="w-5 h-5 text-purple-400" />} 
-              trend="-2 desde ayer"
+              trend="En taller"
               trendUp={false}
               borderColor="border-purple-500/20"
               bgColor="bg-purple-500/5"
             />
             <StatCard 
-              title="Entregados Hoy" 
-              value="15" 
+              title="Entregados" 
+              value={entregados.toString()} 
               icon={<CheckCircle2 className="w-5 h-5 text-emerald-400" />} 
-              trend="+5 vs promedio"
+              trend="Equipos devueltos"
               trendUp={true}
               borderColor="border-emerald-500/20"
               bgColor="bg-emerald-500/5"
             />
           </div>
 
-          {/* Recent Activity Table area placeholder */}
+          {/* Recent Activity Table area */}
           <Card className="bg-slate-900/60 border-slate-800/60 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden">
             <CardHeader className="border-b border-slate-800/50 pb-4">
               <CardTitle className="text-lg font-medium text-slate-200">Actividad Reciente</CardTitle>
               <CardDescription className="text-slate-400">Últimos tickets ingresados y actualizados en el sistema.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="p-8 text-center text-slate-500 border-b border-slate-800/50">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/50 flex items-center justify-center">
-                  <LayoutDashboard className="w-8 h-8 text-slate-600" />
+              {loading ? (
+                <div className="p-8 text-center text-slate-500">Cargando tickets...</div>
+              ) : tickets.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/50 flex items-center justify-center">
+                    <LayoutDashboard className="w-8 h-8 text-slate-600" />
+                  </div>
+                  <p>No hay tickets registrados en el sistema. Crea uno nuevo para comenzar.</p>
                 </div>
-                <p>La tabla de datos de tickets se renderizará aquí utilizando el componente Table de Shadcn y Firebase.</p>
-              </div>
+              ) : (
+                <div className="divide-y divide-slate-800/50">
+                  {tickets.map(ticket => (
+                    <div 
+                      key={ticket.id} 
+                      onClick={() => router.push(`/tickets/${ticket.id}`)}
+                      className="p-4 hover:bg-slate-800/30 flex items-center justify-between cursor-pointer transition-colors group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-2 h-2 rounded-full ${
+                          ticket.estado === 'ENTREGADO' ? 'bg-emerald-500' :
+                          ticket.estado === 'REPARADO' ? 'bg-teal-400' :
+                          ticket.estado === 'EN_REPARACION' ? 'bg-purple-500' :
+                          ticket.estado === 'CERRADO_NO_AUTORIZADO' ? 'bg-rose-500' :
+                          ticket.estado === 'PENDIENTE_APROBACION' ? 'bg-amber-400' :
+                          ticket.estado === 'RECEPCIONADO' ? 'bg-amber-500' : 'bg-blue-500'
+                        }`} />
+                        <div>
+                          <p className="font-medium text-slate-200">{ticket.codigoDT}</p>
+                          <p className="text-sm text-slate-400">S/N: {ticket.numeroSerie} • {ticket.tipoServicio}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium px-2 py-1 rounded-md bg-slate-800 text-slate-300">
+                          {ticket.estado}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -137,11 +201,12 @@ export default function Dashboard() {
   )
 }
 
-function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ icon, label, href, active = false }: { icon: React.ReactNode, label: string, href: string, active?: boolean }) {
+  const router = useRouter()
   return (
-    <a 
-      href="#" 
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group
+    <div 
+      onClick={(e) => { e.preventDefault(); router.push(href) }}
+      className={`cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group
         ${active 
           ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_1px_0_0_rgba(148,163,184,0.1)]' 
           : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
@@ -150,11 +215,21 @@ function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label
         {icon}
       </div>
       <span className="font-medium text-sm">{label}</span>
-    </a>
+    </div>
   )
 }
 
-function StatCard({ title, value, icon, trend, trendUp, borderColor, bgColor }: any) {
+interface StatCardProps {
+  title: string
+  value: string
+  icon: React.ReactNode
+  trend: string
+  trendUp?: boolean
+  borderColor: string
+  bgColor: string
+}
+
+function StatCard({ title, value, icon, trend, trendUp, borderColor, bgColor }: StatCardProps) {
   return (
     <div className={`rounded-2xl border ${borderColor} ${bgColor} backdrop-blur-md p-6 flex flex-col justify-between group hover:-translate-y-1 hover:shadow-lg transition-all duration-300`}>
       <div className="flex justify-between items-start mb-4">

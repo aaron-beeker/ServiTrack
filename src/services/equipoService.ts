@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, doc, getDoc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Equipo, Ticket } from '@/types';
 
@@ -24,5 +24,9 @@ export const getHistorialTicketsEquipo = async (numeroSerie: string): Promise<Ti
   const tickets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
   
   // Ordenar en cliente para no requerir índice compuesto en Firestore inmediatamente
-  return tickets.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return tickets.sort((a, b) => {
+    const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as any)?.toDate?.() || new Date(0);
+    const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as any)?.toDate?.() || new Date(0);
+    return dateB.getTime() - dateA.getTime();
+  });
 };

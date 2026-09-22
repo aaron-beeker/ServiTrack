@@ -3,14 +3,13 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { Ticket, Cliente, Equipo } from '@/types';
 
-// Extend jsPDF interface to include lastAutoTable which is added by jspdf-autotable
 interface jsPDFWithAutoTable extends jsPDF {
   lastAutoTable: {
     finalY: number;
   };
 }
 
-export const generarInformeDT = (
+export const generarConstanciaAtencion = (
   ticket: Ticket,
   cliente: Cliente,
   equipo: Equipo
@@ -18,7 +17,7 @@ export const generarInformeDT = (
   const doc = new jsPDF() as jsPDFWithAutoTable;
   
   // Constantes de estilo
-  const primaryColor: [number, number, number] = [41, 128, 185]; // Azul corporativo ejemplo
+  const primaryColor: [number, number, number] = [41, 128, 185]; 
   const textColor: [number, number, number] = [44, 62, 80];
   
   // 1. Encabezado Institucional
@@ -33,11 +32,11 @@ export const generarInformeDT = (
   doc.text('RUC: 20603786301', 14, 26);
   doc.text('Jr. Rodin N.º 129 Dpto. 301, Surquillo - Lima', 14, 32);
 
-  // Código de Informe
-  doc.setFontSize(16);
-  doc.setTextColor(231, 76, 60); // Rojo para el código
+  // Código
+  doc.setFontSize(14);
+  doc.setTextColor(231, 76, 60); 
   doc.setFont('helvetica', 'bold');
-  doc.text(`INFORME N° ${ticket.codigoDT}`, 130, 20);
+  doc.text(`CONSTANCIA DE ATENCIÓN N° ${ticket.codigoDT}`, 100, 20);
 
   // Helper to safely convert Date or Timestamp
   const safeDate = (date: any) => date instanceof Date ? date : (date?.toDate?.() || new Date(0));
@@ -48,11 +47,11 @@ export const generarInformeDT = (
     startY: startY,
     theme: 'grid',
     headStyles: { fillColor: primaryColor, textColor: 255 },
-    head: [['DATOS DEL CLIENTE', 'FECHAS']],
+    head: [['DATOS DEL CLIENTE', 'FECHA DE ATENCIÓN']],
     body: [
       [
-        `Razón Social: ${cliente.razonSocial}\nContacto: ${cliente.nombreContacto}\nRUC/DNI: ${cliente.clienteId}\nTeléfono: ${cliente.telefono || 'N/A'}\nCorreo: ${cliente.correo || 'N/A'}`,
-        `Fecha de Ingreso: ${format(safeDate(ticket.ingreso?.fecha || ticket.createdAt), 'dd/MM/yyyy HH:mm')}\nFecha de Diagnóstico: ${ticket.diagnostico ? format(safeDate(ticket.diagnostico.fecha), 'dd/MM/yyyy HH:mm') : 'Pendiente'}`
+        `Razón Social: ${cliente.razonSocial}\nContacto: ${cliente.nombreContacto}\nRUC/DNI: ${cliente.clienteId}`,
+        `Fecha de Salida: ${ticket.reparacion?.fechaSalida ? format(safeDate(ticket.reparacion.fechaSalida), 'dd/MM/yyyy HH:mm') : 'N/A'}`
       ],
     ],
     styles: { fontSize: 10, cellPadding: 4, valign: 'middle' }
@@ -69,7 +68,6 @@ export const generarInformeDT = (
       ['Marca:', equipo.marca],
       ['Modelo:', equipo.modelo],
       ['Número de Serie:', equipo.numeroSerie],
-      ['Part Number:', equipo.partNumber || 'N/A'],
     ],
     columnStyles: {
       0: { cellWidth: 50, fontStyle: 'bold' }
@@ -77,38 +75,47 @@ export const generarInformeDT = (
     styles: { fontSize: 10, cellPadding: 3 }
   });
 
-  // 4. Secciones Tabulares del Diagnóstico
+  // 4. Secciones Tabulares de Atención
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 10,
     theme: 'grid',
     headStyles: { fillColor: primaryColor, textColor: 255 },
-    head: [['EVALUACIÓN TÉCNICA']],
+    head: [['DETALLES DEL SERVICIO TÉCNICO']],
     body: [
-      [{ content: 'Falla Reportada por el Cliente:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
+      [{ content: 'Falla Reportada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
       [ticket.ingreso.fallaReportada],
-      [{ content: 'Diagnóstico Técnico:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.diagnostico?.diagnosticoTecnico || 'No diagnosticado'],
       [{ content: 'Falla Real Encontrada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.diagnostico?.fallaReal || 'No definido'],
-      [{ content: 'Acción Recomendada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.diagnostico?.accionRecomendada || 'No definida'],
-      [{ content: 'Observaciones / Daño Físico al Ingreso:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.ingreso.danoFisico || 'Ninguno'],
-      [{ content: 'Repuestos / Piezas Requeridas:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.diagnostico?.repuestos?.join(', ') || 'Ninguno'],
+      [ticket.diagnostico?.fallaReal || 'N/A'],
+      [{ content: 'Actividad Realizada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
+      [ticket.reparacion?.actividadRealizada || 'Ninguna actividad registrada'],
+      [{ content: 'Repuestos Instalados:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
+      [ticket.reparacion?.repuestosInstalados?.join(', ') || 'Ninguno'],
+      [{ content: 'Estado Final del Equipo:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
+      [ticket.estado],
+      [{ content: 'Observaciones Finales:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
+      [ticket.reparacion?.observacionesFinales || 'Ninguna'],
     ],
     styles: { fontSize: 10, cellPadding: 4 }
   });
 
-  // 5. Bloque Legal de Consideraciones
+  // 5. Conformidad y Firmas
+  const currentY = doc.lastAutoTable.finalY + 15;
   doc.setFontSize(8);
   doc.setTextColor(...textColor);
-  const legalText = `CONSIDERACIONES:
-1. El presente informe técnico detalla la evaluación inicial del equipo. Las reparaciones están sujetas a la aprobación de la cotización derivada.
-2. Toda reparación o mantenimiento autorizado cuenta con garantía según lo especificado en la cotización comercial.
-3. El cliente tiene 72 horas tras la recepción del equipo para reportar incidencias relacionadas a este servicio técnico.`;
+  const legalText = `CONSIDERACIONES DE CONFORMIDAD:
+Mediante la presente constancia, el cliente declara haber recibido el equipo arriba detallado en las condiciones descritas y a su entera satisfacción,
+quedando conforme con el servicio técnico realizado por MUR TECNOLOGIA S.A.C.
+Las reparaciones efectuadas cuentan con una garantía de acuerdo a la cotización comercial aprobada.`;
   
-  doc.text(legalText, 14, doc.lastAutoTable.finalY + 10);
+  doc.text(legalText, 14, currentY);
+
+  // Lineas de firma
+  const signatureY = currentY + 30;
+  doc.line(30, signatureY, 90, signatureY); // Firma Cliente
+  doc.text('Firma y Sello del Cliente', 40, signatureY + 5);
+
+  doc.line(120, signatureY, 180, signatureY); // Firma Técnico
+  doc.text('Firma Técnico Responsable', 125, signatureY + 5);
 
   // 6. Pie de página institucional
   const pageHeight = doc.internal.pageSize.height;
@@ -117,5 +124,5 @@ export const generarInformeDT = (
   doc.text('www.murtecnologia.com.pe | mesadeayuda@murtecnologia.com.pe | Telf: (01) XXX-XXXX', 14, pageHeight - 15);
 
   // Generar y descargar el PDF
-  doc.save(`${ticket.codigoDT}_InformeDT.pdf`);
+  doc.save(`${ticket.codigoDT}_Constancia.pdf`);
 };

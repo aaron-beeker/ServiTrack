@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDCT4mwFa00zIsVnAvcH_VQrlMVniDPlbQ",
-  authDomain: "servitrack-14905.firebaseapp.com",
-  projectId: "servitrack-14905",
-  storageBucket: "servitrack-14905.firebasestorage.app",
-  messagingSenderId: "1003236741278",
-  appId: "1:1003236741278:web:416d01de60d1dc05636b8f"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase only if it hasn't been initialized already

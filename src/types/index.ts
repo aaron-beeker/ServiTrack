@@ -19,8 +19,17 @@ export interface Equipo {
   historialTickets: string[]; // Arreglo de IDs de tickets
 }
 
-export type TipoServicio = 'Primer Ingreso' | 'Garantía Técnica' | 'Nueva Incidencia';
-export type EstadoTicket = 'Pendiente' | 'En diagnóstico' | 'Diagnosticado' | 'En reparación' | 'Reparado' | 'Entregado' | 'Inoperativo';
+export type TipoServicio = 'GARANTIA' | 'NUEVO_SERVICIO';
+export type EstadoTicket = 
+  | 'RECEPCIONADO' 
+  | 'EN_DIAGNOSTICO' 
+  | 'DIAGNOSTICADO' 
+  | 'PENDIENTE_APROBACION' 
+  | 'CERRADO_NO_AUTORIZADO' 
+  | 'EN_REPARACION' 
+  | 'CONTROL_CALIDAD' 
+  | 'REPARADO' 
+  | 'ENTREGADO';
 
 export interface Ticket {
   id?: string;
@@ -29,7 +38,7 @@ export interface Ticket {
   clienteId: string; // FK a Cliente
   responsable: string;
   tipoServicio: TipoServicio;
-  ticketOrigenId: string | null;
+  ticketOrigenId: string | null; // ID del ticket anterior si es GARANTIA
   estado: EstadoTicket;
   
   ingreso: {
@@ -46,6 +55,12 @@ export interface Ticket {
     accionRecomendada: string;
     repuestos: string[];
   };
+
+  aprobacion?: {
+    fechaRespuesta: Date;
+    aprobado: boolean;
+    observaciones: string;
+  };
   
   reparacion?: {
     fechaInicio: Date;
@@ -56,5 +71,18 @@ export interface Ticket {
     lugarEntrega: string;
   };
   
+  qa?: {
+    fecha: Date;
+    aprobado: boolean;
+    observaciones: string;
+  };
+  
   createdAt: Date;
+}
+
+export interface ModeloEquipo {
+  id?: string;
+  nombre: string;
+  marca: string;
+  tipo: string;
 }
