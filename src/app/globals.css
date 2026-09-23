@@ -108,7 +108,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-[#090E17] text-slate-100;
+    @apply bg-[#F8FAFC] text-slate-800 antialiased;
   }
   html {
     @apply font-sans scroll-smooth;
@@ -120,14 +120,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #090E17;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #192A45;
+    background: #CBD5E1;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #2369A1;
+    background: #94A3B8;
   }
   ::selection {
     background: #2369A1;

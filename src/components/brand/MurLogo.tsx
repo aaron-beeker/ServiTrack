@@ -6,29 +6,29 @@ interface MurLogoProps {
   className?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   showSubtitle?: boolean
-  light?: boolean
+  darkBackground?: boolean
 }
 
 export function MurLogo({ 
   className = "", 
   size = 'md', 
   showSubtitle = true,
-  light = false 
+  darkBackground = false 
 }: MurLogoProps) {
   const [imgError, setImgError] = useState(false)
 
   const heightClasses = {
     sm: "h-7",
-    md: "h-9",
-    lg: "h-11",
-    xl: "h-14"
+    md: "h-8",
+    lg: "h-10",
+    xl: "h-12"
   }
 
   const iconSizes = {
     sm: "w-7 h-7 text-xs",
-    md: "w-9 h-9 text-sm",
-    lg: "w-11 h-11 text-base",
-    xl: "w-14 h-14 text-lg"
+    md: "w-8 h-8 text-sm",
+    lg: "w-10 h-10 text-base",
+    xl: "w-12 h-12 text-lg"
   }
 
   return (
@@ -36,35 +36,34 @@ export function MurLogo({
       {!imgError ? (
         <div className="flex flex-col">
           <img
-            src={light ? "/mur-logo.png" : "/mur-logo-white.png"}
+            src={darkBackground ? "/mur-logo-white.png" : "/mur-logo.png"}
             alt="MUR Tecnología"
             onError={() => setImgError(true)}
             className={`${heightClasses[size]} w-auto object-contain transition-all`}
           />
           {showSubtitle && (
-            <span className="text-[9px] font-semibold tracking-widest uppercase text-[#38BDF8] mt-1 pl-0.5">
-              Servicio Técnico Especializado • ISO 9001
+            <span className={`text-[10px] font-medium tracking-wider uppercase mt-1 pl-0.5 ${darkBackground ? 'text-slate-400' : 'text-slate-500'}`}>
+              Soporte Técnico Especializado
             </span>
           )}
         </div>
       ) : (
-        /* Fallback Vectorial Minimalista */
-        <div className="flex items-center gap-3">
-          <div className={`${iconSizes[size]} rounded-xl bg-[#2369A1] flex items-center justify-center font-bold text-white shadow-md shadow-[#2369A1]/30 border border-[#38BDF8]/40 shrink-0`}>
-            MUR
+        <div className="flex items-center gap-2.5">
+          <div className={`${iconSizes[size]} rounded-lg bg-[#2369A1] flex items-center justify-center font-bold text-white shadow-xs shrink-0`}>
+            M
           </div>
           <div className="flex flex-col leading-none">
             <div className="flex items-center gap-1.5">
-              <span className={`font-black tracking-tight ${size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-base' : 'text-lg'} ${light ? 'text-[#0F1E2E]' : 'text-white'}`}>
+              <span className={`font-bold tracking-tight ${size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-sm' : 'text-base'} ${darkBackground ? 'text-white' : 'text-slate-900'}`}>
                 MUR
               </span>
-              <span className={`font-semibold tracking-normal ${size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-base' : 'text-lg'} text-[#2369A1]`}>
+              <span className={`font-medium tracking-normal ${size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-sm' : 'text-base'} text-[#2369A1]`}>
                 TECNOLOGÍA
               </span>
             </div>
             {showSubtitle && (
-              <span className="text-[9px] font-semibold tracking-widest uppercase text-slate-400 mt-1">
-                Servicio Técnico Especializado • ISO 9001
+              <span className={`text-[10px] font-medium tracking-wider uppercase mt-0.5 ${darkBackground ? 'text-slate-400' : 'text-slate-500'}`}>
+                Soporte Técnico Especializado
               </span>
             )}
           </div>

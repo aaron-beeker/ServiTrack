@@ -156,7 +156,7 @@ export default function DetalleOrdenPage() {
     if (!ctx) return
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
-    ctx.strokeStyle = '#38bdf8'
+    ctx.strokeStyle = '#2369A1'
     const rect = canvas.getBoundingClientRect()
     ctx.beginPath()
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
@@ -192,20 +192,20 @@ export default function DetalleOrdenPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="text-sm text-slate-400">Cargando orden técnica...</span>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] text-slate-800 gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#2369A1]" />
+        <span className="text-xs text-slate-500">Cargando orden técnica...</span>
       </div>
     )
   }
 
   if (!orden) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 gap-4">
-        <AlertTriangle className="w-12 h-12 text-rose-500" />
-        <p className="text-lg">No se encontró la orden técnica {codigo}.</p>
-        <Button onClick={() => router.push('/')} variant="outline" className="border-slate-800">
-          Volver al Dashboard
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] text-slate-800 gap-3">
+        <AlertTriangle className="w-8 h-8 text-rose-500" />
+        <p className="text-sm font-semibold text-slate-900">No se encontró la orden técnica {codigo}.</p>
+        <Button onClick={() => router.push('/')} variant="outline" className="border-slate-300 text-xs">
+          Volver al Panel
         </Button>
       </div>
     )
@@ -471,242 +471,244 @@ export default function DetalleOrdenPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#090E17] text-slate-100 p-6 md:p-10 max-w-7xl mx-auto space-y-8 font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
       
       {/* Barra Superior con Navegación y Acciones */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-[#2369A1]/20">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => router.push('/')} 
-            className="border-slate-800 bg-[#0F1A2C] hover:bg-[#192A45] text-slate-300 rounded-xl"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <MurLogo size="sm" showSubtitle={false} />
-              <span className="text-slate-600">|</span>
-              <h1 className="text-2xl font-bold text-slate-100 font-mono tracking-tight">
-                Orden {orden.codigoDT}
-              </h1>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                orden.estadoGeneral === 'REPARADO' ? 'bg-teal-500/10 text-teal-400 border-teal-500/30' :
-                orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-[#2369A1]/15 text-[#38BDF8] border-[#2369A1]/30' :
-                orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' :
-                orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
-                orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-[#2369A1]/15 text-[#38BDF8] border-[#2369A1]/30' :
-                'bg-amber-500/10 text-amber-400 border-amber-500/30'
-              }`}>
-                {orden.estadoGeneral}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Cliente: <strong className="text-slate-200">{orden.ingreso.cliente.razonSocial}</strong> (RUC: {orden.ingreso.cliente.ruc})
-            </p>
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => router.push('/')} 
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <MurLogo size="sm" showSubtitle={false} />
+            <span className="text-slate-300">/</span>
+            <span className="font-mono text-sm font-bold text-slate-900">
+              {orden.codigoDT}
+            </span>
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
+              orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              orden.estadoGeneral === 'REPARADO' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+              orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+              orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+              orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+              orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+              orden.estadoGeneral === 'EN_REPARACION' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+              orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+              orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+              'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {orden.estadoGeneral.replace(/_/g, ' ')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Botón Descarga: INFORME DE DIAGNÓSTICO (disponible tras diagnosticar) */}
+            {!['REGISTRADO', 'EN_DIAGNOSTICO'].includes(orden.estadoGeneral) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generarInformeDiagnostico(orden)}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs"
+              >
+                <FileText className="w-3.5 h-3.5 mr-1.5 text-[#2369A1]" />
+                Informe Diagnóstico (PDF)
+              </Button>
+            )}
+
+            {/* Botón Descarga: INFORME TÉCNICO (documento final de cierre) */}
+            {orden.estadoGeneral === 'ENTREGADO' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generarInformeTecnico(orden)}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs"
+              >
+                <FileText className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                Informe Técnico (PDF)
+              </Button>
+            )}
+
+            {/* Acción Etapa 2: Diagnóstico */}
+            {(orden.estadoGeneral === 'REGISTRADO' || orden.estadoGeneral === 'EN_DIAGNOSTICO') && (
+              <Button
+                size="sm"
+                onClick={() => setModalDiagnostico(true)}
+                disabled={actualizando}
+                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold shadow-xs"
+              >
+                <PenTool className="w-3.5 h-3.5 mr-1.5" />
+                Registrar Diagnóstico
+              </Button>
+            )}
+
+            {/* Acción Etapa 2: Decisión de Presupuesto (DIAGNOSTICADO) */}
+            {orden.estadoGeneral === 'DIAGNOSTICADO' && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setModalDecisionRechazo(true)}
+                  disabled={actualizando}
+                  variant="outline"
+                  className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs"
+                >
+                  <ThumbsDown className="w-3.5 h-3.5 mr-1.5" />
+                  Rechazar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setModalDecisionAprobacion(true)}
+                  disabled={actualizando}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5 mr-1.5" />
+                  Aprobar
+                </Button>
+              </div>
+            )}
+
+            {/* Acción Paso a Etapa 3 tras Aprobación */}
+            {orden.estadoGeneral === 'APROBADO_PARA_REPARACION' && (
+              <Button
+                size="sm"
+                onClick={() => setModalAsignarIntervencion(true)}
+                disabled={actualizando}
+                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold shadow-xs"
+              >
+                <Wrench className="w-3.5 h-3.5 mr-1.5" />
+                Iniciar Intervención Taller
+              </Button>
+            )}
+
+            {/* Acción Etapa 3: Cerrar Intervención */}
+            {(orden.estadoGeneral === 'EN_REPARACION' || orden.estadoGeneral === 'OBSERVADO') && (
+              <Button
+                size="sm"
+                onClick={() => setModalCierreIntervencion(true)}
+                disabled={actualizando}
+                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold shadow-xs"
+              >
+                <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                Cerrar Intervención & QA
+              </Button>
+            )}
+
+            {/* Acción Etapa 4: Entrega */}
+            {(orden.estadoGeneral === 'REPARADO' || orden.estadoGeneral === 'INOPERATIVO') && (
+              <Button
+                size="sm"
+                onClick={() => setModalEntrega(true)}
+                disabled={actualizando}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                Registrar Entrega
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 space-y-6">
+
+        {/* Stepper de 4 Etapas */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {etapas.map((etapa) => (
+              <div 
+                key={etapa.num}
+                className={`p-3 rounded-lg border transition-all flex items-center gap-3 ${
+                  etapa.completo 
+                    ? 'bg-emerald-50/50 border-emerald-200/70 text-emerald-800'
+                    : etapa.activo
+                    ? 'bg-[#2369A1]/5 border-[#2369A1]/30 text-[#2369A1]'
+                    : 'bg-slate-50 border-slate-200/60 text-slate-400'
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs shrink-0 ${
+                  etapa.completo ? 'bg-emerald-100 text-emerald-700' :
+                  etapa.activo ? 'bg-[#2369A1] text-white shadow-xs' :
+                  'bg-slate-200 text-slate-500'
+                }`}>
+                  {etapa.completo ? <CheckCircle2 className="w-4 h-4" /> : etapa.num}
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold tracking-wider text-slate-500">Etapa {etapa.num}</p>
+                  <p className="text-xs font-semibold text-slate-900">{etapa.label}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Acciones Rápidas del Ciclo de Vida */}
-        <div className="flex items-center gap-3 flex-wrap">
-          
-          {/* Acción Etapa 2: Diagnóstico */}
-          {(orden.estadoGeneral === 'REGISTRADO' || orden.estadoGeneral === 'EN_DIAGNOSTICO') && (
-            <Button
-              onClick={() => setModalDiagnostico(true)}
-              disabled={actualizando}
-              className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30"
-            >
-              <PenTool className="w-4 h-4 mr-2" />
-              Registrar Diagnóstico Técnico
-            </Button>
-          )}
-
-          {/* Acción Etapa 2: Decisión de Presupuesto (DIAGNOSTICADO) */}
-          {orden.estadoGeneral === 'DIAGNOSTICADO' && (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setModalDecisionRechazo(true)}
-                disabled={actualizando}
-                variant="outline"
-                className="border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
-              >
-                <ThumbsDown className="w-4 h-4 mr-2" />
-                Cliente Rechaza
-              </Button>
-              <Button
-                onClick={() => setModalDecisionAprobacion(true)}
-                disabled={actualizando}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30"
-              >
-                <ThumbsUp className="w-4 h-4 mr-2" />
-                Cliente Aprueba
-              </Button>
-            </div>
-          )}
-
-          {/* Acción Paso a Etapa 3 tras Aprobación */}
-          {orden.estadoGeneral === 'APROBADO_PARA_REPARACION' && (
-            <Button
-              onClick={() => setModalAsignarIntervencion(true)}
-              disabled={actualizando}
-              className="bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/30 animate-pulse"
-            >
-              <Wrench className="w-4 h-4 mr-2" />
-              Asignar Técnico e Iniciar Etapa 3
-            </Button>
-          )}
-
-          {/* Acción Etapa 3: Cerrar Intervención */}
-          {(orden.estadoGeneral === 'EN_REPARACION' || orden.estadoGeneral === 'OBSERVADO') && (
-            <Button
-              onClick={() => setModalCierreIntervencion(true)}
-              disabled={actualizando}
-              className="bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/30"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Cerrar Intervención & QA
-            </Button>
-          )}
-
-          {/* Acción Etapa 4: Entrega */}
-          {(orden.estadoGeneral === 'REPARADO' || orden.estadoGeneral === 'INOPERATIVO') && (
-            <Button
-              onClick={() => setModalEntrega(true)}
-              disabled={actualizando}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30"
-            >
-              <ShieldCheck className="w-4 h-4 mr-2" />
-              Registrar Entrega y Generar Informe Técnico
-            </Button>
-          )}
-
-          {/* Botón Descarga: INFORME DE DIAGNÓSTICO (disponible tras diagnosticar) */}
-          {!['REGISTRADO', 'EN_DIAGNOSTICO'].includes(orden.estadoGeneral) && (
-            <Button
-              variant="outline"
-              onClick={() => generarInformeDiagnostico(orden)}
-              className="border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200"
-            >
-              <FileText className="w-4 h-4 mr-2 text-blue-400" />
-              Informe de Diagnóstico (PDF)
-            </Button>
-          )}
-
-          {/* Botón Descarga: INFORME TÉCNICO (documento final de cierre) */}
-          {orden.estadoGeneral === 'ENTREGADO' && (
-            <Button
-              variant="outline"
-              onClick={() => generarInformeTecnico(orden)}
-              className="border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200"
-            >
-              <FileText className="w-4 h-4 mr-2 text-emerald-400" />
-              Informe Técnico (PDF)
-            </Button>
-          )}
-
-        </div>
-      </div>
-
-      {/* Stepper visual de Etapas */}
-      <div className="bg-slate-900/50 border border-slate-800/60 backdrop-blur-md rounded-2xl p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {etapas.map((etapa) => (
-            <div 
-              key={etapa.num}
-              className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                etapa.completo 
-                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400'
-                  : etapa.activo
-                  ? 'bg-blue-950/30 border-blue-500/40 text-blue-400'
-                  : 'bg-slate-950/40 border-slate-800/40 text-slate-500'
-              }`}
-            >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                etapa.completo ? 'bg-emerald-500/20 text-emerald-300' :
-                etapa.activo ? 'bg-blue-500/20 text-blue-300 animate-pulse' :
-                'bg-slate-800 text-slate-500'
-              }`}>
-                {etapa.completo ? <CheckCircle2 className="w-4 h-4" /> : etapa.num}
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-semibold tracking-wider">Etapa {etapa.num}</p>
-                <p className="text-xs font-medium text-slate-200">{etapa.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Alerta de Decisión de Propuesta */}
-      {orden.estadoGeneral === 'DIAGNOSTICADO' && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30 shadow-xl space-y-3 animate-in fade-in-50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Alerta de Decisión de Propuesta */}
+        {orden.estadoGeneral === 'DIAGNOSTICADO' && (
+          <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
+              <h3 className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[#2369A1]" />
                 Informe de Diagnóstico Emitido — Esperando Decisión del Cliente
               </h3>
-              <p className="text-xs text-slate-300 mt-1">
-                El informe de diagnóstico técnico ha sido redactado. Presente la propuesta técnica al cliente para habilitar la Etapa 3.
+              <p className="text-xs text-blue-700 mt-0.5">
+                El informe de evaluación preliminar ha sido emitido. Presente la propuesta al cliente para autorizar el paso a la Etapa 3.
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button 
+                size="sm"
                 onClick={() => generarInformeDiagnostico(orden)}
                 variant="outline"
-                className="border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 text-xs"
+                className="border-blue-200 bg-white text-blue-800 hover:bg-blue-50 text-xs"
               >
                 <Download className="w-3.5 h-3.5 mr-1.5" />
-                Descargar Informe de Diagnóstico
+                Descargar Informe
               </Button>
               <Button
+                size="sm"
                 onClick={() => setModalDecisionRechazo(true)}
                 variant="outline"
-                className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10 text-xs"
+                className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs"
               >
                 Rechazar
               </Button>
               <Button
+                size="sm"
                 onClick={() => setModalDecisionAprobacion(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
               >
                 Aprobar Intervención
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Alerta si fue Cerrado sin Reparación */}
-      {orden.estadoGeneral === 'CERRADO_SIN_REPARACION' && (
-        <div className="p-5 rounded-2xl bg-rose-950/30 border border-rose-500/30 shadow-lg flex items-start gap-4">
-          <XCircle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
-          <div className="text-xs space-y-1">
-            <h3 className="text-sm font-bold text-rose-200">Ticket Cerrado Sin Reparación</h3>
-            <p className="text-rose-300/80">
-              El cliente no aprobó la propuesta técnica / presupuesto. Motivo: <strong className="text-white">{orden.aprobacion?.motivoRechazo || 'Presupuesto no aceptado'}</strong>
-            </p>
-            <p className="text-slate-400 text-[11px]">
-              El equipo ha sido liquidado en taller y el Nº de Serie queda libre para futuras atenciones.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generarInformeDiagnostico(orden)}
-              className="mt-2 border-rose-500/40 text-rose-300 hover:bg-rose-500/10 text-xs"
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Descargar Acta de Devolución con Informe Adjunto
-            </Button>
+        {/* Alerta si fue Cerrado sin Reparación */}
+        {orden.estadoGeneral === 'CERRADO_SIN_REPARACION' && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 shadow-xs flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <h3 className="text-xs font-bold text-rose-900">Orden Cerrada Sin Reparación</h3>
+              <p className="text-rose-700">
+                El cliente rechazó la intervención. Motivo: <strong>{orden.aprobacion?.motivoRechazo || 'Presupuesto no aceptado'}</strong>
+              </p>
+              <p className="text-slate-500 text-[11px]">
+                El equipo ha sido liquidado en taller y el Nº de Serie queda libre para futuras atenciones.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generarInformeDiagnostico(orden)}
+                className="mt-2 border-rose-300 bg-white text-rose-800 hover:bg-rose-50 text-xs"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Descargar Acta de Devolución
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Cuerpo Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -714,62 +716,62 @@ export default function DetalleOrdenPage() {
         {/* Columna Izquierda: Información de Cliente y Equipo */}
         <div className="space-y-6">
           
-          <Card className="bg-slate-900/70 border-slate-800/80 shadow-lg">
-            <CardHeader className="pb-3 border-b border-slate-800/50">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-200">
-                <Building2 className="w-4 h-4 text-blue-400" />
+          <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#2369A1]" />
                 Datos del Cliente
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 space-y-2.5 text-xs text-slate-300">
-              <p><strong className="text-slate-100">Razón Social:</strong> {orden.ingreso.cliente.razonSocial}</p>
-              <p><strong className="text-slate-100">RUC:</strong> <span className="font-mono text-blue-400">{orden.ingreso.cliente.ruc}</span></p>
-              <p><strong className="text-slate-100">Contacto:</strong> {orden.ingreso.cliente.contacto}</p>
-              <p><strong className="text-slate-100">Teléfono:</strong> {orden.ingreso.cliente.telefono || 'No registrado'}</p>
-              <p><strong className="text-slate-100">Correo:</strong> {orden.ingreso.cliente.correo || 'No registrado'}</p>
+            <CardContent className="pt-4 space-y-2 text-xs text-slate-600">
+              <p><strong className="text-slate-900 font-medium">Razón Social:</strong> {orden.ingreso.cliente.razonSocial}</p>
+              <p><strong className="text-slate-900 font-medium">RUC:</strong> <span className="font-mono text-[#2369A1] font-semibold">{orden.ingreso.cliente.ruc}</span></p>
+              <p><strong className="text-slate-900 font-medium">Contacto:</strong> {orden.ingreso.cliente.contacto}</p>
+              <p><strong className="text-slate-900 font-medium">Teléfono:</strong> {orden.ingreso.cliente.telefono || 'No registrado'}</p>
+              <p><strong className="text-slate-900 font-medium">Correo:</strong> {orden.ingreso.cliente.correo || 'No registrado'}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/70 border-slate-800/80 shadow-lg">
-            <CardHeader className="pb-3 border-b border-slate-800/50">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-200">
-                <Laptop className="w-4 h-4 text-blue-400" />
+          <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <Laptop className="w-4 h-4 text-[#2369A1]" />
                 Dispositivo en Taller
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 space-y-2.5 text-xs text-slate-300">
-              <p><strong className="text-slate-100">Tipo:</strong> {orden.ingreso.equipo.tipoEquipo || 'Laptop'}</p>
-              <p><strong className="text-slate-100">Marca / Modelo:</strong> {orden.ingreso.equipo.marca} {orden.ingreso.equipo.modelo}</p>
+            <CardContent className="pt-4 space-y-2 text-xs text-slate-600">
+              <p><strong className="text-slate-900 font-medium">Tipo:</strong> {orden.ingreso.equipo.tipoEquipo || 'Laptop'}</p>
+              <p><strong className="text-slate-900 font-medium">Marca / Modelo:</strong> {orden.ingreso.equipo.marca} {orden.ingreso.equipo.modelo}</p>
               <p>
-                <strong className="text-slate-100">Nº Serie (S/N):</strong>{' '}
-                <span className="font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                <strong className="text-slate-900 font-medium">Nº Serie (S/N):</strong>{' '}
+                <span className="font-mono text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-semibold">
                   {orden.ingreso.equipo.numeroSerie}
                 </span>
               </p>
-              <p><strong className="text-slate-100">Part Number:</strong> {orden.ingreso.equipo.partNumber || 'No especificado'}</p>
+              <p><strong className="text-slate-900 font-medium">Part Number:</strong> {orden.ingreso.equipo.partNumber || 'No especificado'}</p>
             </CardContent>
           </Card>
 
           {/* Tarjeta de Aprobación si existe */}
           {orden.aprobacion && (
-            <Card className={`border shadow-lg ${
+            <Card className={`border shadow-xs rounded-xl ${
               orden.aprobacion.aprobado 
-                ? 'bg-emerald-950/20 border-emerald-500/30' 
-                : 'bg-rose-950/20 border-rose-500/30'
+                ? 'bg-emerald-50/50 border-emerald-200' 
+                : 'bg-rose-50/50 border-rose-200'
             }`}>
-              <CardHeader className="pb-2 border-b border-slate-800/50">
-                <CardTitle className="text-xs font-semibold flex items-center gap-2 text-slate-200">
-                  {orden.aprobacion.aprobado ? <ThumbsUp className="w-4 h-4 text-emerald-400" /> : <ThumbsDown className="w-4 h-4 text-rose-400" />}
+              <CardHeader className="pb-2 border-b border-slate-100">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                  {orden.aprobacion.aprobado ? <ThumbsUp className="w-4 h-4 text-emerald-600" /> : <ThumbsDown className="w-4 h-4 text-rose-600" />}
                   Decisión de Propuesta Técnica
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-3 space-y-2 text-xs text-slate-300">
-                <p>Resultado: <strong className={orden.aprobacion.aprobado ? 'text-emerald-400' : 'text-rose-400'}>
+              <CardContent className="pt-3 space-y-1.5 text-xs text-slate-700">
+                <p>Resultado: <strong className={orden.aprobacion.aprobado ? 'text-emerald-700' : 'text-rose-700'}>
                   {orden.aprobacion.aprobado ? 'APROBADO PARA REPARACIÓN' : 'RECHAZADO POR CLIENTE'}
                 </strong></p>
-                <p>Fecha Decisión: <span className="text-slate-300">{new Date(orden.aprobacion.fechaDecision || '').toLocaleString()}</span></p>
+                <p>Fecha Decisión: <span className="text-slate-600">{new Date(orden.aprobacion.fechaDecision || '').toLocaleString()}</span></p>
                 {orden.aprobacion.motivoRechazo && (
-                  <p>Motivo: <span className="text-rose-200">{orden.aprobacion.motivoRechazo}</span></p>
+                  <p>Motivo: <span className="text-rose-700 font-medium">{orden.aprobacion.motivoRechazo}</span></p>
                 )}
               </CardContent>
             </Card>
@@ -780,44 +782,44 @@ export default function DetalleOrdenPage() {
         {/* Columna Derecha: Tabs de Fases */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="diagnostico" className="w-full">
-            <TabsList className="bg-slate-900/80 border border-slate-800 w-full justify-start rounded-xl p-1 gap-1">
-              <TabsTrigger value="ingreso" className="rounded-lg text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400">
+            <TabsList className="bg-slate-100 border border-slate-200 w-full justify-start rounded-lg p-1 gap-1">
+              <TabsTrigger value="ingreso" className="rounded-md text-xs font-medium text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs transition-all">
                 1. Ingreso
               </TabsTrigger>
-              <TabsTrigger value="diagnostico" className="rounded-lg text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400">
-                2. Informe de Diagnóstico
+              <TabsTrigger value="diagnostico" className="rounded-md text-xs font-medium text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs transition-all">
+                2. Diagnóstico
               </TabsTrigger>
-              <TabsTrigger value="intervencion" className="rounded-lg text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400">
+              <TabsTrigger value="intervencion" className="rounded-md text-xs font-medium text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs transition-all">
                 3. Intervención & QA
               </TabsTrigger>
-              <TabsTrigger value="cierre" className="rounded-lg text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400">
-                4. Informe Técnico Final
+              <TabsTrigger value="cierre" className="rounded-md text-xs font-medium text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs transition-all">
+                4. Cierre & Entrega
               </TabsTrigger>
             </TabsList>
 
             {/* TAB 1: INGRESO */}
-            <TabsContent value="ingreso" className="mt-6 space-y-4">
-              <Card className="bg-slate-900/70 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="text-base text-slate-100">Detalles de Recepción en Taller</CardTitle>
+            <TabsContent value="ingreso" className="mt-4 space-y-4">
+              <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+                <CardHeader className="pb-3 border-b border-slate-100">
+                  <CardTitle className="text-sm font-semibold text-slate-900">Detalles de Recepción en Taller</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-4 space-y-4">
                   <div>
-                    <h4 className="text-xs font-semibold text-slate-400 mb-1.5">Falla Reportada Inicial</h4>
-                    <p className="text-slate-200 bg-slate-950 p-4 rounded-xl border border-slate-800 text-sm">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Falla Reportada Inicial</h4>
+                    <p className="text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs leading-relaxed">
                       {orden.ingreso.fallaReportada}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
-                      <span className="text-slate-400 block mb-1">Fecha de Recepción</span>
-                      <strong className="text-slate-200 font-mono">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block mb-0.5 text-[11px]">Fecha de Recepción</span>
+                      <strong className="text-slate-900 font-mono">
                         {new Date(orden.ingreso.fechaIngreso).toLocaleString()}
                       </strong>
                     </div>
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
-                      <span className="text-slate-400 block mb-1">Operador que Registró</span>
-                      <strong className="text-slate-200">{orden.ingreso.registradoPor}</strong>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block mb-0.5 text-[11px]">Operador que Registró</span>
+                      <strong className="text-slate-900">{orden.ingreso.registradoPor}</strong>
                     </div>
                   </div>
                 </CardContent>
@@ -825,93 +827,93 @@ export default function DetalleOrdenPage() {
             </TabsContent>
 
             {/* TAB 2: DIAGNÓSTICO */}
-            <TabsContent value="diagnostico" className="mt-6 space-y-4">
-              <Card className="bg-slate-900/70 border-slate-800">
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <TabsContent value="diagnostico" className="mt-4 space-y-4">
+              <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <CardTitle className="text-base text-slate-100">Evaluación Técnica y Catálogo de Piezas</CardTitle>
-                    <CardDescription className="text-xs text-slate-400">Pruebas de descarte y especificación para el Informe de Diagnóstico.</CardDescription>
+                    <CardTitle className="text-sm font-semibold text-slate-900">Evaluación Técnica y Catálogo de Piezas</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Pruebas de descarte y especificación para el Informe de Diagnóstico.</CardDescription>
                   </div>
                   {!['CERRADO_SIN_REPARACION', 'ENTREGADO'].includes(orden.estadoGeneral) && (
                     <Button 
                       size="sm" 
                       onClick={() => setModalDiagnostico(true)} 
                       variant="outline" 
-                      className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 text-xs"
+                      className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs"
                     >
-                      <PenTool className="w-3.5 h-3.5 mr-1.5" />
+                      <PenTool className="w-3.5 h-3.5 mr-1.5 text-[#2369A1]" />
                       Editar Diagnóstico
                     </Button>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-4 space-y-4">
                   {orden.diagnostico.tipoFalla || orden.diagnostico.diagnosticoDetallado ? (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-xs text-slate-400 block mb-1">Tipificación de Falla</span>
-                          <span className="text-sm font-semibold text-indigo-400">
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block mb-0.5">Tipificación de Falla</span>
+                          <span className="text-xs font-semibold text-slate-900">
                             {orden.diagnostico.tipoFalla || 'NO ESPECIFICADA'}
                           </span>
                         </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-xs text-slate-400 block mb-1">Técnico Evaluador</span>
-                          <span className="text-sm font-semibold text-slate-200">
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block mb-0.5">Técnico Evaluador</span>
+                          <span className="text-xs font-semibold text-slate-900">
                             {orden.diagnostico.tecnicoDiagnostico || 'No asignado'}
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-400 mb-1.5">Condición Estética y Daños Físicos</h4>
-                        <p className="text-slate-300 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Condición Estética y Daños Físicos</h4>
+                        <p className="text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
                           {orden.diagnostico.danosFisicos || 'Sin observaciones estéticas.'}
                         </p>
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-400 mb-1.5">Diagnóstico Técnico y Causa Raíz</h4>
-                        <p className="text-slate-200 bg-slate-950 p-4 rounded-xl border border-slate-800 text-sm">
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Diagnóstico Técnico y Causa Raíz</h4>
+                        <p className="text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs leading-relaxed">
                           {orden.diagnostico.diagnosticoDetallado || 'No redactado.'}
                         </p>
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-400 mb-1.5">
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                           {orden.diagnostico.requiereRepuestos ? 'Componentes Requeridos del Catálogo Homologado' : 'Requerimiento de Servicio o Mantenimiento'}
                         </h4>
 
                         {orden.diagnostico.requiereRepuestos ? (
                           orden.diagnostico.repuestosRequeridos && orden.diagnostico.repuestosRequeridos.length > 0 ? (
-                            <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl bg-slate-950 overflow-hidden">
+                            <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg bg-white overflow-hidden">
                               {orden.diagnostico.repuestosRequeridos.map((rep, idx) => (
                                 <div key={idx} className="p-3 flex items-center justify-between text-xs">
                                   <div>
-                                    <span className="font-mono font-bold text-blue-400 mr-2">[{rep.partNumber}]</span>
-                                    <span className="text-slate-200 font-medium">{rep.descripcion}</span>
+                                    <span className="font-mono font-bold text-[#2369A1] mr-2">[{rep.partNumber}]</span>
+                                    <span className="text-slate-900 font-medium">{rep.descripcion}</span>
                                   </div>
-                                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] border border-slate-200">
                                     Cant: {rep.cantidad}
                                   </span>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-amber-400 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                            <p className="text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
                               Requiere repuestos pero no se han seleccionado ítems del catálogo.
                             </p>
                           )
                         ) : (
-                          <p className="text-slate-200 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
+                          <p className="text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
                             {orden.diagnostico.solucionPropuesta || 'Mantenimiento preventivo y limpieza de componentes.'}
                           </p>
                         )}
                       </div>
                     </>
                   ) : (
-                    <div className="text-center p-8 text-slate-500 space-y-3">
-                      <p className="text-sm">El diagnóstico técnico aún no ha sido redactado.</p>
-                      <Button onClick={() => setModalDiagnostico(true)} className="bg-blue-600 hover:bg-blue-500 text-white text-xs">
+                    <div className="text-center py-10 text-slate-500 space-y-2">
+                      <p className="text-xs">El diagnóstico técnico aún no ha sido redactado.</p>
+                      <Button onClick={() => setModalDiagnostico(true)} className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs">
                         Abrir Formulario de Diagnóstico
                       </Button>
                     </div>
@@ -921,12 +923,12 @@ export default function DetalleOrdenPage() {
             </TabsContent>
 
             {/* TAB 3: INTERVENCIÓN Y QA */}
-            <TabsContent value="intervencion" className="mt-6 space-y-4">
-              <Card className="bg-slate-900/70 border-slate-800">
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <TabsContent value="intervencion" className="mt-4 space-y-4">
+              <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <CardTitle className="text-base text-slate-100">Intervención de Taller y Pruebas QA</CardTitle>
-                    <CardDescription className="text-xs text-slate-400">
+                    <CardTitle className="text-sm font-semibold text-slate-900">Intervención de Taller y Pruebas QA</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">
                       Solo ejecutable si el cliente aprueba el Informe de Diagnóstico.
                     </CardDescription>
                   </div>
@@ -934,50 +936,50 @@ export default function DetalleOrdenPage() {
                     <Button 
                       size="sm" 
                       onClick={() => setModalCierreIntervencion(true)} 
-                      className="bg-purple-600 hover:bg-purple-500 text-white text-xs"
+                      className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
                     >
                       Cerrar Intervención & QA
                     </Button>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-4 space-y-4">
                   {!['APROBADO_PARA_REPARACION', 'EN_REPARACION', 'REPARADO', 'INOPERATIVO', 'OBSERVADO', 'ENTREGADO'].includes(orden.estadoGeneral) ? (
-                    <div className="p-8 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-xl bg-slate-950/40">
-                      <Lock className="w-8 h-8 text-slate-600 mx-auto" />
-                      <p className="text-sm text-slate-300 font-semibold">Etapa 3 Bloqueada</p>
-                      <p className="text-xs text-slate-400 max-w-md mx-auto">
-                        Para iniciar la intervención física se requiere que el cliente acepte formalmente el Informe de Diagnóstico y presupuesto en la Etapa 2.
+                    <div className="py-12 text-center text-slate-500 space-y-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                      <Lock className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-xs font-semibold text-slate-700">Etapa 3 Bloqueada</p>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        Para iniciar la intervención se requiere que el cliente acepte el Informe de Diagnóstico en la Etapa 2.
                       </p>
                     </div>
                   ) : orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? (
-                    <div className="p-6 text-center text-slate-300 space-y-3 bg-blue-950/20 border border-blue-500/30 rounded-xl">
-                      <ThumbsUp className="w-8 h-8 text-blue-400 mx-auto" />
-                      <p className="text-sm font-semibold text-blue-200">Informe de Diagnóstico Aprobado por el Cliente</p>
-                      <p className="text-xs text-slate-400">
-                        El cliente ha brindado su conformidad. Asigne al técnico responsable para iniciar la intervención física.
+                    <div className="p-6 text-center text-slate-700 space-y-2 bg-blue-50/60 border border-blue-200 rounded-xl">
+                      <ThumbsUp className="w-6 h-6 text-[#2369A1] mx-auto" />
+                      <p className="text-xs font-semibold text-blue-900">Informe Aprobado por el Cliente</p>
+                      <p className="text-xs text-slate-600">
+                        El cliente ha brindado su conformidad. Asigne al técnico responsable para iniciar la reparación.
                       </p>
-                      <Button onClick={() => setModalAsignarIntervencion(true)} className="bg-purple-600 hover:bg-purple-500 text-white text-xs">
+                      <Button onClick={() => setModalAsignarIntervencion(true)} className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs mt-2">
                         <Wrench className="w-3.5 h-3.5 mr-1.5" />
                         Asignar Técnico e Iniciar Reparación
                       </Button>
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-xs text-slate-400 block mb-1">Técnico Ejecutor</span>
-                          <strong className="text-sm text-slate-200">{orden.intervencion.tecnicoAsignado || 'No asignado'}</strong>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block mb-0.5">Técnico Ejecutor</span>
+                          <strong className="text-xs text-slate-900">{orden.intervencion.tecnicoAsignado || 'No asignado'}</strong>
                         </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-xs text-slate-400 block mb-1">Horas-Hombre</span>
-                          <strong className="text-sm font-mono text-purple-400">{orden.intervencion.horasHombre || 0} hrs</strong>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block mb-0.5">Horas-Hombre</span>
+                          <strong className="text-xs font-mono text-slate-900">{orden.intervencion.horasHombre || 0} hrs</strong>
                         </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-xs text-slate-400 block mb-1">Control de Calidad (QA)</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="text-[11px] text-slate-500 block mb-0.5">Control de Calidad (QA)</span>
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
                             orden.intervencion.pruebasQA?.superoPruebas !== false
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : 'bg-rose-500/20 text-rose-300'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}>
                             {orden.intervencion.pruebasQA?.superoPruebas !== false ? 'QA CONFORME' : 'NO CONFORME'}
                           </span>
@@ -985,16 +987,16 @@ export default function DetalleOrdenPage() {
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-400 mb-1.5">Actividades Ejecutadas</h4>
-                        <p className="text-slate-200 bg-slate-950 p-4 rounded-xl border border-slate-800 text-sm">
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Actividades Ejecutadas</h4>
+                        <p className="text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs leading-relaxed">
                           {orden.intervencion.actividadesRealizadas || 'En proceso de ejecución.'}
                         </p>
                       </div>
 
                       {orden.intervencion.pruebasQA?.observacionesQA && (
                         <div>
-                          <h4 className="text-xs font-semibold text-slate-400 mb-1.5">Observaciones de Calidad</h4>
-                          <p className="text-slate-300 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
+                          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Observaciones de Calidad</h4>
+                          <p className="text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
                             {orden.intervencion.pruebasQA.observacionesQA}
                           </p>
                         </div>
@@ -1006,30 +1008,30 @@ export default function DetalleOrdenPage() {
             </TabsContent>
 
             {/* TAB 4: INFORME TÉCNICO FINAL Y ENTREGA */}
-            <TabsContent value="cierre" className="mt-6 space-y-4">
-              <Card className="bg-slate-900/70 border-slate-800">
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <TabsContent value="cierre" className="mt-4 space-y-4">
+              <Card className="bg-white border border-slate-200 rounded-xl shadow-xs">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <CardTitle className="text-base text-slate-100">Informe Técnico Final y Entrega</CardTitle>
-                    <CardDescription className="text-xs text-slate-400">Emisión de Informe Técnico final con recuadros de firma y conformidad.</CardDescription>
+                    <CardTitle className="text-sm font-semibold text-slate-900">Informe Técnico Final y Entrega</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Emisión de Informe Técnico final con recuadros de firma y conformidad.</CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-4 space-y-4">
                   {orden.estadoGeneral === 'ENTREGADO' ? (
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between">
+                      <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                           <div>
-                            <p className="text-sm font-semibold text-emerald-200">Equipo Entregado e Informe Técnico Emitido</p>
-                            <p className="text-xs text-emerald-400/80">
+                            <p className="text-xs font-semibold text-emerald-900">Equipo Entregado e Informe Técnico Emitido</p>
+                            <p className="text-[11px] text-emerald-700">
                               Receptor: {orden.cierre.receptorNombre} (DNI/RUC: {orden.cierre.receptorDniRuc})
                             </p>
                           </div>
                         </div>
                         <Button 
                           onClick={() => generarInformeTecnico(orden)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
                         >
                           <Download className="w-3.5 h-3.5 mr-1.5" />
                           Descargar Informe Técnico
@@ -1037,24 +1039,24 @@ export default function DetalleOrdenPage() {
                       </div>
                     </div>
                   ) : orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? (
-                    <div className="p-6 text-center text-slate-400 space-y-3 bg-slate-950/50 rounded-xl border border-slate-800">
-                      <p className="text-sm text-slate-200 font-semibold">Orden Cerrada Sin Reparación</p>
+                    <div className="p-6 text-center text-slate-500 space-y-2 bg-slate-50 rounded-xl border border-slate-200">
+                      <p className="text-xs text-slate-900 font-semibold">Orden Cerrada Sin Reparación</p>
                       <p className="text-xs">Se emitió Acta de Devolución con el Informe de Diagnóstico adjunto.</p>
                       <Button 
                         onClick={() => generarInformeDiagnostico(orden)}
                         variant="outline"
-                        className="border-slate-700 text-xs"
+                        className="border-slate-200 bg-white text-xs text-slate-700"
                       >
-                        <Download className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+                        <Download className="w-3.5 h-3.5 mr-1.5 text-[#2369A1]" />
                         Descargar Acta de Devolución
                       </Button>
                     </div>
                   ) : (
-                    <div className="text-center p-8 text-slate-500 space-y-3">
-                      <p className="text-sm">El equipo aún no ha completado el ciclo de taller para su entrega.</p>
+                    <div className="text-center py-10 text-slate-500 space-y-2">
+                      <p className="text-xs">El equipo aún no ha completado el ciclo de taller para su entrega.</p>
                       {['REPARADO', 'INOPERATIVO'].includes(orden.estadoGeneral) && (
-                        <Button onClick={() => setModalEntrega(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs">
-                          Completar Datos de Entrega y Emitir Informe Técnico
+                        <Button onClick={() => setModalEntrega(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+                          Registrar Entrega y Emitir Informe Técnico
                         </Button>
                       )}
                     </div>
@@ -1065,23 +1067,22 @@ export default function DetalleOrdenPage() {
 
           </Tabs>
         </div>
-
       </div>
+
+    </main>
 
       {/* ========================================================================= */}
       {/* MODAL ETAPA 2: DIAGNÓSTICO TÉCNICO & CATÁLOGO */}
       {/* ========================================================================= */}
       <Dialog open={modalDiagnostico} onOpenChange={setModalDiagnostico}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden shadow-2xl">
-          <div className="p-6 pb-4 border-b border-slate-800 bg-slate-900/60">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="p-6 pb-4 border-b border-slate-200 bg-white">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                  <PenTool className="w-4 h-4" />
-                </span>
-                ETAPA 2: Diagnóstico Técnico y Emisión de Informe de Diagnóstico
+              <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <PenTool className="w-4 h-4 text-[#2369A1]" />
+                Diagnóstico Técnico y Emisión de Informe de Diagnóstico
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-400">
+              <DialogDescription className="text-xs text-slate-500">
                 Al guardar, el estado pasará a DIAGNOSTICADO y se emitirá el <strong>Informe de Diagnóstico</strong> en PDF para el cliente.
               </DialogDescription>
             </DialogHeader>
@@ -1090,11 +1091,11 @@ export default function DetalleOrdenPage() {
           <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs text-slate-300">Técnico que Diagnostica</Label>
+                <Label className="text-xs text-slate-700">Técnico que Diagnostica</Label>
                 <select
                   value={tecnicoDiag}
                   onChange={(e) => setTecnicoDiag(e.target.value)}
-                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100"
+                  className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-[#2369A1]"
                 >
                   {usuarios.map(u => (
                     <option key={u.id} value={u.nombreCompleto}>{u.nombreCompleto}</option>
@@ -1106,11 +1107,11 @@ export default function DetalleOrdenPage() {
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300">Tipificación de Origen de Falla *</Label>
+                <Label className="text-xs text-slate-700">Tipificación de Falla *</Label>
                 <select
                   value={tipoFalla}
                   onChange={(e) => setTipoFalla(e.target.value as TipoFalla)}
-                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100"
+                  className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-[#2369A1]"
                 >
                   <option value="HARDWARE">Hardware (Físico / Componentes)</option>
                   <option value="SOFTWARE">Software (Sistema Operativo / Drivers)</option>
@@ -1120,44 +1121,44 @@ export default function DetalleOrdenPage() {
             </div>
 
             <div>
-              <Label className="text-xs text-slate-300">Condición Estética y Daños Físicos Externos</Label>
+              <Label className="text-xs text-slate-700">Condición Estética y Daños Físicos Externos</Label>
               <Input
                 placeholder="Ej. Desgaste leve en bordes, carcasa intacta"
                 value={danosFisicos}
                 onChange={(e) => setDanosFisicos(e.target.value)}
-                className="mt-1 bg-slate-950 border-slate-700 text-sm"
+                className="mt-1 bg-white border-slate-300 text-xs"
               />
             </div>
 
             <div>
-              <Label className="text-xs text-slate-300">Diagnóstico Técnico Detallado y Causa Raíz *</Label>
+              <Label className="text-xs text-slate-700">Diagnóstico Técnico Detallado y Causa Raíz *</Label>
               <textarea
                 rows={3}
                 placeholder="Redacte las pruebas de descarte realizadas y la causa origen de la avería..."
                 value={diagDetallado}
                 onChange={(e) => setDiagDetallado(e.target.value)}
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#2369A1] focus:outline-none"
                 required
               />
             </div>
 
             {/* Selector: ¿Requiere reemplazo de componentes físicos? */}
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs font-semibold text-slate-200 block">
+                  <Label className="text-xs font-semibold text-slate-800 block">
                     ¿Requiere Reemplazo de Componentes Físicos?
                   </Label>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-slate-500">
                     {requiereRepuestos ? "Seleccionar piezas desde Catálogo Homologado" : "Definir requerimiento de servicio o mantenimiento"}
                   </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
                     type="button"
                     onClick={() => setRequiereRepuestos(false)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      !requiereRepuestos ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      !requiereRepuestos ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     NO
@@ -1165,8 +1166,8 @@ export default function DetalleOrdenPage() {
                   <button
                     type="button"
                     onClick={() => setRequiereRepuestos(true)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      requiereRepuestos ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      requiereRepuestos ? 'bg-[#2369A1] text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     SÍ
@@ -1175,13 +1176,13 @@ export default function DetalleOrdenPage() {
               </div>
 
               {requiereRepuestos ? (
-                <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="space-y-3 pt-2 border-t border-slate-200">
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1">
                       <select
                         value={repuestoActualId}
                         onChange={(e) => setRepuestoActualId(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-100"
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900"
                       >
                         {catalogoRepuestos.map(r => (
                           <option key={r.id} value={r.id}>
@@ -1190,41 +1191,41 @@ export default function DetalleOrdenPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="w-24">
+                    <div className="w-20">
                       <Input
                         type="number"
                         min={1}
                         max={10}
                         value={cantidadRepuesto}
                         onChange={(e) => setCantidadRepuesto(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="bg-slate-950 border-slate-700 text-xs text-center"
+                        className="bg-white border-slate-300 text-xs text-center"
                       />
                     </div>
                     <Button
                       type="button"
                       onClick={handleAgregarRepuesto}
-                      className="bg-blue-600 hover:bg-blue-500 text-white text-xs shrink-0"
+                      className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1" /> Añadir
                     </Button>
                   </div>
 
                   {repuestosSeleccionados.length > 0 && (
-                    <div className="border border-slate-800 rounded-lg overflow-hidden divide-y divide-slate-800 bg-slate-950">
+                    <div className="border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100 bg-white">
                       {repuestosSeleccionados.map((item) => (
                         <div key={item.partNumber} className="p-2.5 flex items-center justify-between text-xs">
                           <div>
-                            <span className="font-mono text-blue-400 font-bold mr-2">[{item.partNumber}]</span>
-                            <span className="text-slate-200">{item.descripcion}</span>
+                            <span className="font-mono text-[#2369A1] font-bold mr-2">[{item.partNumber}]</span>
+                            <span className="text-slate-800 font-medium">{item.descripcion}</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded">
+                            <span className="font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
                               x{item.cantidad}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleEliminarRepuesto(item.partNumber)}
-                              className="text-rose-400 hover:text-rose-300 p-1"
+                              className="text-rose-600 hover:text-rose-700 p-1"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1235,14 +1236,14 @@ export default function DetalleOrdenPage() {
                   )}
                 </div>
               ) : (
-                <div className="pt-2 border-t border-slate-800">
-                  <Label className="text-xs text-slate-300">Requerimiento de Servicio o Mantenimiento *</Label>
+                <div className="pt-2 border-t border-slate-200">
+                  <Label className="text-xs text-slate-700">Requerimiento de Servicio o Mantenimiento *</Label>
                   <textarea
                     rows={2}
                     placeholder="Ej. Mantenimiento general, limpieza de sistema térmico y formateo lógico..."
                     value={solucionPropuesta}
                     onChange={(e) => setSolucionPropuesta(e.target.value)}
-                    className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-100"
+                    className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900"
                   />
                 </div>
               )}
@@ -1250,17 +1251,17 @@ export default function DetalleOrdenPage() {
 
           </div>
 
-          <DialogFooter className="p-4 border-t border-slate-800 bg-slate-900/40">
-            <Button variant="ghost" onClick={() => setModalDiagnostico(false)} className="text-slate-400 text-xs">
+          <DialogFooter className="p-4 border-t border-slate-200 bg-slate-50">
+            <Button variant="outline" onClick={() => setModalDiagnostico(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleGuardarDiagnostico} 
               disabled={actualizando} 
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs"
+              className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Guardar y Emitir Informe de Diagnóstico
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Guardar y Emitir Informe
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1270,42 +1271,42 @@ export default function DetalleOrdenPage() {
       {/* MODAL DECISIÓN CLIENTE: APROBACIÓN DE PROPUESTA */}
       {/* ========================================================================= */}
       <Dialog open={modalDecisionAprobacion} onOpenChange={setModalDecisionAprobacion}>
-        <DialogContent className="sm:max-w-[500px] bg-slate-950 border border-slate-800 text-slate-100 p-6 shadow-2xl">
+        <DialogContent className="sm:max-w-[480px] bg-white border border-slate-200 text-slate-800 p-6 shadow-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2 text-emerald-400">
-              <ThumbsUp className="w-5 h-5" />
-              Registrar Conformidad y Aprobación del Cliente
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-emerald-700">
+              <ThumbsUp className="w-5 h-5 text-emerald-600" />
+              Aprobación del Cliente
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400">
-              Al registrar la aprobación, el estado pasará a <strong>APROBADO_PARA_REPARACION</strong> y se habilitará la Etapa 3 (Intervención y Reparación).
+            <DialogDescription className="text-xs text-slate-500">
+              Al registrar la aprobación, el estado pasará a <strong>APROBADO_PARA_REPARACION</strong> y se habilitará la Etapa 3.
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-3 text-xs">
             <div>
-              <Label className="text-xs text-slate-300">Registrado por (Operador/Mesa)</Label>
+              <Label className="text-xs text-slate-700">Registrado por (Operador/Mesa)</Label>
               <Input
                 value={operadorAprobacion}
                 onChange={(e) => setOperadorAprobacion(e.target.value)}
-                className="mt-1 bg-slate-950 border-slate-700 text-xs"
+                className="mt-1 bg-white border-slate-300 text-xs"
               />
             </div>
-            <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-emerald-300 text-[11px]">
-              El cliente confirma la ejecución de los trabajos y el reemplazo de piezas homologadas según el Informe de Diagnóstico.
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px]">
+              El cliente confirma la ejecución de los trabajos y repuestos según el Informe de Diagnóstico.
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setModalDecisionAprobacion(false)} className="text-slate-400 text-xs">
+            <Button variant="outline" onClick={() => setModalDecisionAprobacion(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleAprobarPropuesta} 
               disabled={actualizando} 
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Confirmar Aprobación (Avanzar a Etapa 3)
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Confirmar Aprobación
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1315,45 +1316,45 @@ export default function DetalleOrdenPage() {
       {/* MODAL DECISIÓN CLIENTE: RECHAZO DE PROPUESTA */}
       {/* ========================================================================= */}
       <Dialog open={modalDecisionRechazo} onOpenChange={setModalDecisionRechazo}>
-        <DialogContent className="sm:max-w-[500px] bg-slate-950 border border-slate-800 text-slate-100 p-6 shadow-2xl">
+        <DialogContent className="sm:max-w-[480px] bg-white border border-slate-200 text-slate-800 p-6 shadow-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-400">
-              <ThumbsDown className="w-5 h-5" />
-              Registrar Rechazo de Propuesta Comercial
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-700">
+              <ThumbsDown className="w-5 h-5 text-rose-600" />
+              Rechazo de Propuesta Comercial
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400">
-              El cliente rechaza el presupuesto o intervención. Se actualizará el estado a <strong>CERRADO_SIN_REPARACION</strong> y se emitirá el Acta de Devolución liberando la serie.
+            <DialogDescription className="text-xs text-slate-500">
+              El cliente rechaza la intervención. El estado pasará a <strong>CERRADO_SIN_REPARACION</strong> y se liberará la serie del equipo.
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-3 text-xs">
             <div>
-              <Label className="text-xs text-slate-300">Motivo del Rechazo *</Label>
+              <Label className="text-xs text-slate-700">Motivo del Rechazo *</Label>
               <textarea
                 rows={3}
                 value={motivoRechazo}
                 onChange={(e) => setMotivoRechazo(e.target.value)}
                 placeholder="Ej. Costo de repuesto excede presupuesto del cliente..."
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900"
                 required
               />
             </div>
-            <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 text-rose-300 text-[11px]">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px]">
               Al confirmar, el ticket se cierra definitivamente sin pasar a intervención.
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setModalDecisionRechazo(false)} className="text-slate-400 text-xs">
+            <Button variant="outline" onClick={() => setModalDecisionRechazo(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleRechazarPropuesta} 
               disabled={actualizando} 
-              className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold"
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Confirmar Rechazo y Cerrar Ticket
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Confirmar Rechazo y Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1363,24 +1364,24 @@ export default function DetalleOrdenPage() {
       {/* MODAL ASIGNAR TÉCNICO FORMAL E INICIAR ETAPA 3 */}
       {/* ========================================================================= */}
       <Dialog open={modalAsignarIntervencion} onOpenChange={setModalAsignarIntervencion}>
-        <DialogContent className="sm:max-w-[500px] bg-slate-950 border border-slate-800 text-slate-100 p-6 shadow-2xl">
+        <DialogContent className="sm:max-w-[480px] bg-white border border-slate-200 text-slate-800 p-6 shadow-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2 text-purple-400">
-              <Wrench className="w-5 h-5" />
-              Asignar Técnico Ejecutor Formal
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+              <Wrench className="w-5 h-5 text-[#2369A1]" />
+              Asignar Técnico Responsable
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400">
-              Paso formal de inicio de la <strong>ETAPA 3: Intervención y Reparación</strong>. Estado pasará a <strong>EN_REPARACION</strong>.
+            <DialogDescription className="text-xs text-slate-500">
+              Inicio de la <strong>ETAPA 3: Intervención de Taller</strong>. El estado cambiará a <strong>EN_REPARACION</strong>.
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-3 text-xs">
             <div>
-              <Label className="text-xs text-slate-300">Técnico Ejecutor Asignado *</Label>
+              <Label className="text-xs text-slate-700">Técnico Ejecutor Asignado *</Label>
               <select
                 value={tecnicoAsignado}
                 onChange={(e) => setTecnicoAsignado(e.target.value)}
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-[#2369A1]"
               >
                 {usuarios.map(u => (
                   <option key={u.id} value={u.nombreCompleto}>{u.nombreCompleto} ({u.cargo || u.rol})</option>
@@ -1393,16 +1394,16 @@ export default function DetalleOrdenPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setModalAsignarIntervencion(false)} className="text-slate-400 text-xs">
+            <Button variant="outline" onClick={() => setModalAsignarIntervencion(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleIniciarReparacionFormal} 
               disabled={actualizando} 
-              className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
+              className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Iniciar Intervención (EN_REPARACION)
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Iniciar Intervención
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1412,16 +1413,14 @@ export default function DetalleOrdenPage() {
       {/* MODAL CIERRE DE INTERVENCIÓN Y QA (ETAPA 3) */}
       {/* ========================================================================= */}
       <Dialog open={modalCierreIntervencion} onOpenChange={setModalCierreIntervencion}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden shadow-2xl">
-          <div className="p-6 pb-4 border-b border-slate-800 bg-slate-900/60">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="p-6 pb-4 border-b border-slate-200 bg-white">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-purple-600/20 text-purple-400 border border-purple-500/30">
-                  <Wrench className="w-4 h-4" />
-                </span>
+              <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-[#2369A1]" />
                 Cierre de Intervención Técnica y Control de Calidad (QA)
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-400">
+              <DialogDescription className="text-xs text-slate-500">
                 Documentar actividades, horas-hombre, pruebas de operatividad y firma digital.
               </DialogDescription>
             </DialogHeader>
@@ -1430,43 +1429,43 @@ export default function DetalleOrdenPage() {
           <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs text-slate-300">Técnico Ejecutor</Label>
+                <Label className="text-xs text-slate-700">Técnico Ejecutor</Label>
                 <Input
                   value={tecnicoAsignado}
                   disabled
-                  className="mt-1 bg-slate-900 border-slate-800 text-sm text-slate-400 font-medium"
+                  className="mt-1 bg-slate-50 border-slate-200 text-xs text-slate-600 font-medium"
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300">Horas-Hombre Invertidas (H-H) *</Label>
+                <Label className="text-xs text-slate-700">Horas-Hombre Invertidas (H-H) *</Label>
                 <Input
                   type="number"
                   step="0.5"
                   min="0.5"
                   value={horasHombre}
                   onChange={(e) => setHorasHombre(parseFloat(e.target.value) || 1)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-sm font-mono"
+                  className="mt-1 bg-white border-slate-300 text-xs font-mono"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <Label className="text-xs text-slate-300">Actividades Realizadas y Observaciones Técnicas *</Label>
+              <Label className="text-xs text-slate-700">Actividades Realizadas y Observaciones Técnicas *</Label>
               <textarea
                 rows={3}
                 placeholder="Detalle el cambio de piezas, configuración técnica, pruebas térmicas..."
                 value={actividades}
                 onChange={(e) => setActividades(e.target.value)}
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-purple-500 focus:outline-none"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#2369A1] focus:outline-none"
                 required
               />
             </div>
 
             {/* QA Selector */}
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <Label className="text-xs font-semibold text-slate-200 block">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <Label className="text-xs font-semibold text-slate-800 block">
                 ¿Superó exitosamente las pruebas de operatividad (QA)?
               </Label>
               
@@ -1474,95 +1473,95 @@ export default function DetalleOrdenPage() {
                 <button
                   type="button"
                   onClick={() => setSuperoQA(true)}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all ${
+                  className={`flex-1 p-3 rounded-xl border text-left transition-colors ${
                     superoQA 
-                      ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-300 shadow-sm' 
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     SÍ — Pruebas Superadas (REPARADO)
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">El equipo opera al 100% de especificación.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">El equipo opera al 100% de especificación.</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSuperoQA(false)}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all ${
+                  className={`flex-1 p-3 rounded-xl border text-left transition-colors ${
                     !superoQA 
-                      ? 'bg-rose-950/30 border-rose-500/50 text-rose-300 shadow-sm' 
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <XCircle className="w-4 h-4 text-rose-400" />
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <XCircle className="w-4 h-4 text-rose-600" />
                     NO — Falla Persistente
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Equipo irreparable o re-evaluación.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Equipo irreparable o re-evaluación.</p>
                 </button>
               </div>
 
               {!superoQA && (
-                <div className="p-3 bg-slate-950 rounded-xl border border-rose-500/30 space-y-2 animate-in fade-in-50">
-                  <Label className="text-xs text-rose-300 font-semibold">
+                <div className="p-3 bg-white rounded-lg border border-rose-200 space-y-2">
+                  <Label className="text-xs text-rose-800 font-semibold">
                     ¿El equipo es irreparable o costo inviable?
                   </Label>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setTipoNoAprobado('OBSERVADO')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                      className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold ${
                         tipoNoAprobado === 'OBSERVADO'
                           ? 'bg-amber-600 text-white'
-                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                     >
-                      NO — Marcar OBSERVADO (Re-evaluación)
+                      NO — OBSERVADO (Re-evaluación)
                     </button>
                     <button
                       type="button"
                       onClick={() => setTipoNoAprobado('INOPERATIVO')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                      className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold ${
                         tipoNoAprobado === 'INOPERATIVO'
                           ? 'bg-rose-600 text-white'
-                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                     >
-                      SÍ — Marcar INOPERATIVO
+                      SÍ — INOPERATIVO
                     </button>
                   </div>
                 </div>
               )}
 
               <div>
-                <Label className="text-xs text-slate-400">Observaciones de Control de Calidad</Label>
+                <Label className="text-xs text-slate-600">Observaciones de Control de Calidad</Label>
                 <Input
                   placeholder="Detalle encendido, estrés, periféricos, audio, puertos..."
                   value={observacionesQA}
                   onChange={(e) => setObservacionesQA(e.target.value)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-xs"
+                  className="mt-1 bg-white border-slate-300 text-xs"
                 />
               </div>
             </div>
 
             {/* Firma digital técnica */}
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-slate-200">
+                <Label className="text-xs font-semibold text-slate-800">
                   Firma Digital del Técnico Responsable
                 </Label>
                 <button
                   type="button"
                   onClick={clearCanvas}
-                  className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1"
+                  className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
                 >
                   <RotateCcw className="w-3 h-3" /> Limpiar Trazo
                 </button>
               </div>
 
-              <div className="border border-slate-700 rounded-xl bg-slate-950 overflow-hidden flex justify-center">
+              <div className="border border-slate-300 rounded-lg bg-white overflow-hidden flex justify-center">
                 <canvas
                   ref={canvasRef}
                   width={500}
@@ -1578,17 +1577,17 @@ export default function DetalleOrdenPage() {
 
           </div>
 
-          <DialogFooter className="p-4 border-t border-slate-800 bg-slate-900/40">
-            <Button variant="ghost" onClick={() => setModalCierreIntervencion(false)} className="text-slate-400 text-xs">
+          <DialogFooter className="p-4 border-t border-slate-200 bg-slate-50">
+            <Button variant="outline" onClick={() => setModalCierreIntervencion(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleFinalizarIntervencion} 
               disabled={actualizando} 
-              className="bg-purple-600 hover:bg-purple-500 text-white text-xs"
+              className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Persistir Cierre Técnico
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Confirmar Cierre Técnico
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1598,92 +1597,92 @@ export default function DetalleOrdenPage() {
       {/* MODAL ETAPA 4: ENTREGA Y EMISIÓN DE INFORME TÉCNICO FINAL */}
       {/* ========================================================================= */}
       <Dialog open={modalEntrega} onOpenChange={setModalEntrega}>
-        <DialogContent className="sm:max-w-[600px] flex flex-col bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden shadow-2xl">
-          <div className="p-6 pb-4 border-b border-slate-800 bg-slate-900/60">
+        <DialogContent className="sm:max-w-[580px] flex flex-col bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="p-6 pb-4 border-b border-slate-200 bg-white">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-emerald-400">
-                <ShieldCheck className="w-5 h-5" />
-                ETAPA 4: Cierre Formal y Emisión de Informe Técnico
+              <DialogTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                Entrega Formal y Emisión de Informe Técnico
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-400">
-                Registrar datos de entrega, conformidad del cliente y emitir el <strong>Informe Técnico</strong> final en PDF.
+              <DialogDescription className="text-xs text-slate-500">
+                Registrar datos de entrega y emitir el <strong>Informe Técnico final en PDF</strong>.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="p-6 space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-slate-300">Fecha de Entrega *</Label>
+                <Label className="text-xs text-slate-700">Fecha de Entrega *</Label>
                 <Input
                   type="date"
                   value={fechaEntrega}
                   onChange={(e) => setFechaEntrega(e.target.value)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-sm"
+                  className="mt-1 bg-white border-slate-300 text-xs"
                   required
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300">Lugar de Entrega *</Label>
+                <Label className="text-xs text-slate-700">Lugar de Entrega *</Label>
                 <Input
                   value={lugarEntrega}
                   onChange={(e) => setLugarEntrega(e.target.value)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-sm"
+                  className="mt-1 bg-white border-slate-300 text-xs"
                   required
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300">Nombre del Receptor / Cliente *</Label>
+                <Label className="text-xs text-slate-700">Nombre del Receptor / Cliente *</Label>
                 <Input
                   placeholder="Persona que recibe el equipo"
                   value={receptorNombre}
                   onChange={(e) => setReceptorNombre(e.target.value)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-sm"
+                  className="mt-1 bg-white border-slate-300 text-xs"
                   required
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300">DNI / RUC del Receptor *</Label>
+                <Label className="text-xs text-slate-700">DNI / RUC del Receptor *</Label>
                 <Input
                   placeholder="Documento de identidad"
                   value={receptorDni}
                   onChange={(e) => setReceptorDni(e.target.value)}
-                  className="mt-1 bg-slate-950 border-slate-700 text-sm font-mono"
+                  className="mt-1 bg-white border-slate-300 text-xs font-mono"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <Label className="text-xs text-slate-300">Observaciones de Entrega</Label>
+              <Label className="text-xs text-slate-700">Observaciones de Entrega</Label>
               <textarea
                 rows={2}
                 placeholder="Ej. Equipo verificado en operatividad y encendido delante del receptor."
                 value={observacionesFinales}
                 onChange={(e) => setObservacionesFinales(e.target.value)}
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100"
+                className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900"
               />
             </div>
 
-            <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-300">
-              Al confirmar, el estado cambiará a <strong>ENTREGADO</strong> y se descargará automáticamente el <strong>Informe Técnico final en PDF</strong>.
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800">
+              Al confirmar, el estado cambiará a <strong>ENTREGADO</strong> y se descargará el <strong>Informe Técnico final</strong>.
             </div>
           </div>
 
-          <DialogFooter className="p-4 border-t border-slate-800 bg-slate-900/40">
-            <Button variant="ghost" onClick={() => setModalEntrega(false)} className="text-slate-400 text-xs">
+          <DialogFooter className="p-4 border-t border-slate-200 bg-slate-50">
+            <Button variant="outline" onClick={() => setModalEntrega(false)} className="border-slate-300 text-slate-700 text-xs">
               Cancelar
             </Button>
             <Button 
               onClick={handleRegistrarEntrega} 
               disabled={actualizando} 
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
             >
-              {actualizando ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Confirmar Entrega y Descargar Informe Técnico
+              {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Confirmar Entrega y Descargar Informe
             </Button>
           </DialogFooter>
         </DialogContent>
