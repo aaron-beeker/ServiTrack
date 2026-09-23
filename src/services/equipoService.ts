@@ -1,6 +1,6 @@
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Equipo, Ticket } from '@/types';
+import { Equipo, OrdenServicio } from '@/types';
 
 export const getEquipoBySerie = async (numeroSerie: string): Promise<Equipo | null> => {
   const equiposRef = collection(db, 'equipos');
@@ -15,18 +15,18 @@ export const getEquipoBySerie = async (numeroSerie: string): Promise<Equipo | nu
   return { id: docSnap.id, ...docSnap.data() } as Equipo;
 };
 
-// Obtiene los tickets de un equipo ordenados por fecha (simulando, o requiriendo índice si usamos orderBy)
-export const getHistorialTicketsEquipo = async (numeroSerie: string): Promise<Ticket[]> => {
-  const ticketsRef = collection(db, 'tickets');
-  const q = query(ticketsRef, where('numeroSerie', '==', numeroSerie));
-  const querySnapshot = await getDocs(q);
+// Obtiene las órdenes de un equipo ordenadas por fecha
+export const getHistorialTicketsEquipo = async (numeroSerie: string): Promise<OrdenServicio[]> => {
+  const ref = collection(db, 'ordenes_servicio');
+  const snapshot = await getDocs(ref);
   
-  const tickets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
+  const ordenes = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as OrdenServicio))
+    .filter(ord => ord.ingreso?.equipo?.numeroSerie?.trim().toUpperCase() === numeroSerie.trim().toUpperCase());
   
-  // Ordenar en cliente para no requerir índice compuesto en Firestore inmediatamente
-  return tickets.sort((a, b) => {
-    const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as any)?.toDate?.() || new Date(0);
-    const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as any)?.toDate?.() || new Date(0);
-    return dateB.getTime() - dateA.getTime();
+  return ordenes.sort((a, b) => {
+    const dateA = new Date(a.creadoEl || 0).getTime();
+    const dateB = new Date(b.creadoEl || 0).getTime();
+    return dateB - dateA;
   });
 };

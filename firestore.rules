@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Reglas para órdenes de atención técnica (Colección Principal)
+    match /ordenes_servicio/{codigoDT} {
+      allow read, write: if true; // Habilitado para desarrollo local y pruebas en Vercel
+      
+      // Validación de integridad para producción futura:
+      // allow create, update: if request.resource.data.ingreso.equipo.numeroSerie != null
+      //   && request.resource.data.ingreso.cliente.ruc.size() == 11;
+    }
+    
+    // 2. Catálogo maestro de repuestos
+    match /repuestos/{repuestoId} {
+      allow read, write: if true;
+    }
+    match /catalogo_repuestos/{repuestoId} {
+      allow read, write: if true;
+    }
+    
+    // 3. Catálogo de usuarios y técnicos
+    match /usuarios/{usuarioId} {
+      allow read, write: if true;
+    }
+
+    // 4. Regla general comodín para colecciones auxiliares y pruebas
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

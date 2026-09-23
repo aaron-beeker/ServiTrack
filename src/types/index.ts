@@ -1,85 +1,139 @@
-export interface Cliente {
-  id?: string; // Document ID en Firestore
-  clienteId: string; // RUC/DNI
-  razonSocial: string;
-  nombreContacto: string;
-  telefono: string;
-  correo: string;
-  createdAt: Date;
-}
-
-export interface Equipo {
-  id?: string;
-  numeroSerie: string; // Único
-  tipo: string;
-  marca: string;
-  modelo: string;
-  partNumber: string;
-  clienteId: string; // FK a Cliente
-  historialTickets: string[]; // Arreglo de IDs de tickets
-}
-
-export type TipoServicio = 'GARANTIA' | 'NUEVO_SERVICIO';
-export type EstadoTicket = 
-  | 'RECEPCIONADO' 
+export type EstadoGeneral = 
+  | 'REGISTRADO' 
   | 'EN_DIAGNOSTICO' 
   | 'DIAGNOSTICADO' 
-  | 'PENDIENTE_APROBACION' 
-  | 'CERRADO_NO_AUTORIZADO' 
+  | 'DIAGNOSTICADO_NO_APROBADO'
+  | 'CERRADO_SIN_REPARACION'
+  | 'APROBADO_PARA_REPARACION'
   | 'EN_REPARACION' 
-  | 'CONTROL_CALIDAD' 
   | 'REPARADO' 
+  | 'INOPERATIVO' 
+  | 'OBSERVADO' 
   | 'ENTREGADO';
 
-export interface Ticket {
-  id?: string;
-  codigoDT: string; // Correlativo 'DT-XXXXXX'
-  numeroSerie: string; // FK a Equipo
-  clienteId: string; // FK a Cliente
-  responsable: string;
-  tipoServicio: TipoServicio;
-  ticketOrigenId: string | null; // ID del ticket anterior si es GARANTIA
-  estado: EstadoTicket;
-  
-  ingreso: {
-    fecha: Date;
-    fallaReportada: string;
-    danoFisico: string;
-    accesorios: string[];
-  };
-  
-  diagnostico?: {
-    fecha: Date;
-    diagnosticoTecnico: string;
-    fallaReal: string;
-    accionRecomendada: string;
-    repuestos: string[];
-  };
+export type TipoFalla = 'HARDWARE' | 'SOFTWARE' | 'OPERATIVO';
 
-  aprobacion?: {
-    fechaRespuesta: Date;
-    aprobado: boolean;
-    observaciones: string;
-  };
-  
-  reparacion?: {
-    fechaInicio: Date;
-    actividadRealizada: string;
-    repuestosInstalados: string[];
-    observacionesFinales: string;
-    fechaSalida: Date | null;
-    lugarEntrega: string;
-  };
-  
-  qa?: {
-    fecha: Date;
-    aprobado: boolean;
-    observaciones: string;
-  };
-  
-  createdAt: Date;
+export interface ClienteOrden {
+  razonSocial: string;
+  ruc: string; // 11 dígitos
+  contacto: string;
+  telefono?: string;
+  correo?: string;
 }
 
+export interface EquipoOrden {
+  tipoEquipo: string;
+  marca: string;
+  modelo: string;
+  numeroSerie: string;
+  partNumber?: string;
+}
+
+export interface RepuestoItem {
+  partNumber: string;
+  descripcion: string;
+  cantidad: number;
+}
+
+export interface IngresoOrden {
+  fechaIngreso: string;
+  registradoPor: string;
+  cliente: ClienteOrden;
+  equipo: EquipoOrden;
+  fallaReportada: string;
+}
+
+export interface DiagnosticoOrden {
+  fechaDiagnostico: string | null;
+  tecnicoDiagnostico: string | null;
+  tipoFalla: TipoFalla | null;
+  diagnosticoDetallado: string | null;
+  danosFisicos: string | null;
+  requiereRepuestos: boolean;
+  solucionPropuesta?: string | null;
+  repuestosRequeridos: RepuestoItem[];
+}
+
+export interface AprobacionCliente {
+  fechaDecision: string | null;
+  aprobado: boolean; // true: Aprobado para reparación, false: Rechazado
+  motivoRechazo?: string | null;
+  registradoPor?: string | null;
+}
+
+export interface IntervencionOrden {
+  fechaIntervencion: string | null;
+  tecnicoAsignado: string | null;
+  actividadesRealizadas: string | null;
+  horasHombre: number;
+  estadoReparacion: 'REPARADO' | 'INOPERATIVO' | 'OBSERVADO' | null;
+  pruebasQA?: {
+    superoPruebas: boolean;
+    observacionesQA?: string;
+  } | null;
+  firmaDigitalTecnico?: string | null;
+}
+
+export interface CierreOrden {
+  fechaEntrega: string | null;
+  lugarEntrega: string | null;
+  receptorNombre?: string | null;
+  receptorDniRuc?: string | null;
+  firmaReceptor?: string | null;
+  observacionesFinales: string | null;
+  constanciaGenerada: boolean;
+  urlPdf: string | null;
+}
+
+export interface OrdenServicio {
+  id?: string;
+  codigoDT: string; // 'DT-XXXXXX' (document ID en Firestore)
+  estadoGeneral: EstadoGeneral;
+  creadoEl: string;
+  actualizadoEl: string;
+  ingreso: IngresoOrden;
+  diagnostico: DiagnosticoOrden;
+  aprobacion?: AprobacionCliente | null;
+  intervencion: IntervencionOrden;
+  cierre: CierreOrden;
+}
+
+// Catálogo maestro: repuestos
+export interface RepuestoCatalogo {
+  id: string; // Part Number (doc id)
+  descripcion: string;
+  marca: string;
+  modeloCompatible: string;
+  categoria: string;
+  stock: number;
+  activo: boolean;
+}
+
+// Catálogo maestro: usuarios
+export interface UsuarioSistema {
+  id: string; // e.g. "beeker.valdez"
+  nombreCompleto: string;
+  correo: string;
+  rol: 'ADMIN' | 'TECNICO';
+  cargo: string;
+  activo: boolean;
+}
+
+// Aliases para retrocompatibilidad
+export type Ticket = OrdenServicio;
+export type EstadoTicket = EstadoGeneral;
+export interface Cliente extends ClienteOrden {
+  id?: string;
+  clienteId: string;
+  nombreContacto: string;
+  createdAt?: Date;
+}
+export interface Equipo extends EquipoOrden {
+  id?: string;
+  tipo: string;
+  clienteId?: string;
+  historialTickets?: string[];
+}
 export interface ModeloEquipo {
   id?: string;
   nombre: string;

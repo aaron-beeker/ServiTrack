@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import { Ticket, Cliente, Equipo } from '@/types';
+import { OrdenServicio } from '@/types';
 
 interface jsPDFWithAutoTable extends jsPDF {
   lastAutoTable: {
@@ -9,120 +9,151 @@ interface jsPDFWithAutoTable extends jsPDF {
   };
 }
 
-export const generarConstanciaAtencion = (
-  ticket: Ticket,
-  cliente: Cliente,
-  equipo: Equipo
-) => {
+/**
+ * ETAPA 4: Generación del INFORME TÉCNICO FINAL
+ * Reemplaza la hoja 'ConstAtenciónServicio' con el Informe Técnico de cierre,
+ * incluyendo actividades de intervención, QA, y recuadros para firma y sello de conformidad.
+ */
+export const generarInformeTecnico = (orden: OrdenServicio) => {
   const doc = new jsPDF() as jsPDFWithAutoTable;
   
-  // Constantes de estilo
-  const primaryColor: [number, number, number] = [41, 128, 185]; 
-  const textColor: [number, number, number] = [44, 62, 80];
-  
+  const primaryColor: [number, number, number] = [30, 58, 138]; // Azul corporativo
+  const accentColor: [number, number, number] = [16, 185, 129]; // Verde esmeralda conformidad
+  const textColor: [number, number, number] = [30, 41, 59];
+
   // 1. Encabezado Institucional
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.setTextColor(...primaryColor);
   doc.setFont('helvetica', 'bold');
-  doc.text('MUR TECNOLOGIA S.A.C.', 14, 20);
+  doc.text('MUR TECNOLOGIA S.A.C.', 14, 18);
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(...textColor);
   doc.setFont('helvetica', 'normal');
-  doc.text('RUC: 20603786301', 14, 26);
-  doc.text('Jr. Rodin N.º 129 Dpto. 301, Surquillo - Lima', 14, 32);
+  doc.text('RUC: 20603786301  |  Informe Técnico Final y Conformidad de Servicio', 14, 24);
+  doc.text('Jr. Rodin N.º 129 Dpto. 301, Surquillo - Lima', 14, 29);
 
-  // Código
+  // Código de Informe Técnico Final
   doc.setFontSize(14);
-  doc.setTextColor(231, 76, 60); 
+  doc.setTextColor(220, 38, 38);
   doc.setFont('helvetica', 'bold');
-  doc.text(`CONSTANCIA DE ATENCIÓN N° ${ticket.codigoDT}`, 100, 20);
+  doc.text(`INFORME TÉCNICO N° ${orden.codigoDT}`, 110, 18);
 
-  // Helper to safely convert Date or Timestamp
-  const safeDate = (date: any) => date instanceof Date ? date : (date?.toDate?.() || new Date(0));
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Estado Final: ${orden.estadoGeneral}`, 110, 24);
 
-  // 2. Bloque Cliente y Fechas
-  let startY = 45;
+  const safeFormatDate = (val: string | null | undefined) => {
+    if (!val) return 'N/A';
+    try {
+      return format(new Date(val), 'dd/MM/yyyy HH:mm');
+    } catch {
+      return String(val);
+    }
+  };
+
+  // 2. Bloque Cliente y Entrega
   autoTable(doc, {
-    startY: startY,
+    startY: 36,
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255 },
-    head: [['DATOS DEL CLIENTE', 'FECHA DE ATENCIÓN']],
+    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+    head: [['DATOS DEL CLIENTE', 'DATOS DE RECEPCIÓN Y ENTREGA']],
     body: [
       [
-        `Razón Social: ${cliente.razonSocial}\nContacto: ${cliente.nombreContacto}\nRUC/DNI: ${cliente.clienteId}`,
-        `Fecha de Salida: ${ticket.reparacion?.fechaSalida ? format(safeDate(ticket.reparacion.fechaSalida), 'dd/MM/yyyy HH:mm') : 'N/A'}`
+        `Razón Social: ${orden.ingreso.cliente.razonSocial}\nRUC: ${orden.ingreso.cliente.ruc}\nContacto: ${orden.ingreso.cliente.contacto}\nTeléfono: ${orden.ingreso.cliente.telefono || 'N/A'}`,
+        `Fecha de Entrega: ${safeFormatDate(orden.cierre.fechaEntrega)}\nLugar: ${orden.cierre.lugarEntrega || 'Taller MUR Tecnología'}\nReceptor: ${orden.cierre.receptorNombre || orden.ingreso.cliente.contacto}\nDNI/RUC Receptor: ${orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc}`
       ],
     ],
-    styles: { fontSize: 10, cellPadding: 4, valign: 'middle' }
+    styles: { fontSize: 9, cellPadding: 3.5, valign: 'top' }
   });
 
   // 3. Bloque Equipo
   autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 10,
+    startY: doc.lastAutoTable.finalY + 6,
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255 },
-    head: [['DATOS DEL EQUIPO', '']],
+    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+    head: [['DATOS DEL EQUIPO INTERVENIDO', '']],
     body: [
-      ['Tipo:', equipo.tipo],
-      ['Marca:', equipo.marca],
-      ['Modelo:', equipo.modelo],
-      ['Número de Serie:', equipo.numeroSerie],
+      ['Tipo de Dispositivo:', orden.ingreso.equipo.tipoEquipo || 'Laptop'],
+      ['Marca y Modelo:', `${orden.ingreso.equipo.marca} ${orden.ingreso.equipo.modelo}`],
+      ['Número de Serie (S/N):', orden.ingreso.equipo.numeroSerie],
+      ['Part Number (P/N):', orden.ingreso.equipo.partNumber || 'No especificado'],
     ],
     columnStyles: {
-      0: { cellWidth: 50, fontStyle: 'bold' }
+      0: { cellWidth: 55, fontStyle: 'bold' }
     },
-    styles: { fontSize: 10, cellPadding: 3 }
+    styles: { fontSize: 9, cellPadding: 2.5 }
   });
 
-  // 4. Secciones Tabulares de Atención
+  // 4. Detalle de la Intervención y Solución
+  const repuestosInstalados = orden.diagnostico.requiereRepuestos && orden.diagnostico.repuestosRequeridos && orden.diagnostico.repuestosRequeridos.length > 0
+    ? orden.diagnostico.repuestosRequeridos.map(r => `• [${r.partNumber}] ${r.descripcion} (${r.cantidad} und)`).join('\n')
+    : 'Ninguno (Mantenimiento físico y/o configuración lógica)';
+
   autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 10,
+    startY: doc.lastAutoTable.finalY + 6,
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255 },
-    head: [['DETALLES DEL SERVICIO TÉCNICO']],
+    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+    head: [['DETALLES DEL SERVICIO TÉCNICO Y CONTROL DE CALIDAD']],
     body: [
-      [{ content: 'Falla Reportada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.ingreso.fallaReportada],
-      [{ content: 'Falla Real Encontrada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.diagnostico?.fallaReal || 'N/A'],
-      [{ content: 'Actividad Realizada:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.reparacion?.actividadRealizada || 'Ninguna actividad registrada'],
-      [{ content: 'Repuestos Instalados:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.reparacion?.repuestosInstalados?.join(', ') || 'Ninguno'],
-      [{ content: 'Estado Final del Equipo:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.estado],
-      [{ content: 'Observaciones Finales:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }],
-      [ticket.reparacion?.observacionesFinales || 'Ninguna'],
+      [{ content: 'Falla Inicial Reportada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [orden.ingreso.fallaReportada],
+      [{ content: 'Diagnóstico y Causa Raíz Comprobada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [orden.diagnostico.diagnosticoDetallado || 'Diagnóstico de hardware/software completado'],
+      [{ content: 'Actividades Realizadas en Taller:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [orden.intervencion.actividadesRealizadas || 'Servicio técnico, sustitución de partes y pruebas de operatividad.'],
+      [{ content: 'Repuestos Homologados Instalados:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [repuestosInstalados],
+      [{ content: 'Datos de Intervención y Horas Invertidas:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [`Técnico Ejecutor: ${orden.intervencion.tecnicoAsignado || 'Especialista de Taller'} | Horas-Hombre: ${orden.intervencion.horasHombre || 1} hrs | QA Operativo: ${orden.intervencion.pruebasQA?.superoPruebas !== false ? 'CONFORME (100% Operativo)' : 'OBSERVADO / NO CONFORME'}`],
+      [{ content: 'Observaciones de Entrega:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
+      [orden.cierre.observacionesFinales || 'Equipo entregado en perfecto estado operativo con pruebas de encendido conformes.']
     ],
-    styles: { fontSize: 10, cellPadding: 4 }
+    styles: { fontSize: 8.5, cellPadding: 2.8 }
   });
 
-  // 5. Conformidad y Firmas
-  const currentY = doc.lastAutoTable.finalY + 15;
-  doc.setFontSize(8);
-  doc.setTextColor(...textColor);
-  const legalText = `CONSIDERACIONES DE CONFORMIDAD:
-Mediante la presente constancia, el cliente declara haber recibido el equipo arriba detallado en las condiciones descritas y a su entera satisfacción,
-quedando conforme con el servicio técnico realizado por MUR TECNOLOGIA S.A.C.
-Las reparaciones efectuadas cuentan con una garantía de acuerdo a la cotización comercial aprobada.`;
-  
+  // 5. Cláusula de Conformidad
+  const currentY = doc.lastAutoTable.finalY + 6;
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  const legalText = `DECLARACIÓN DE CONFORMIDAD Y ACEPTACIÓN DEL SERVICIO:
+El cliente/receptor declara recibir el equipo en óptimas condiciones de funcionamiento y estética, habiendo verificado las pruebas de operatividad correspondientes.
+La garantía del servicio técnico cubre exclusivamente los componentes instalados y la mano de obra documentada según los términos de MUR TECNOLOGÍA S.A.C.`;
   doc.text(legalText, 14, currentY);
 
-  // Lineas de firma
-  const signatureY = currentY + 30;
-  doc.line(30, signatureY, 90, signatureY); // Firma Cliente
-  doc.text('Firma y Sello del Cliente', 40, signatureY + 5);
-
-  doc.line(120, signatureY, 180, signatureY); // Firma Técnico
-  doc.text('Firma Técnico Responsable', 125, signatureY + 5);
-
-  // 6. Pie de página institucional
-  const pageHeight = doc.internal.pageSize.height;
-  doc.setFontSize(9);
+  // 6. Recuadros para Firma y Sello de Conformidad (reemplaza ConstAtenciónServicio)
+  const boxY = currentY + 12;
+  
+  // Recuadro Firma Cliente
+  doc.setDrawColor(148, 163, 184);
+  doc.rect(14, boxY, 86, 32);
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
   doc.setFont('helvetica', 'bold');
-  doc.text('www.murtecnologia.com.pe | mesadeayuda@murtecnologia.com.pe | Telf: (01) XXX-XXXX', 14, pageHeight - 15);
+  doc.text('FIRMA Y SELLO DE CONFORMIDAD DEL CLIENTE', 18, boxY + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Receptor: ${orden.cierre.receptorNombre || orden.ingreso.cliente.contacto}`, 18, boxY + 24);
+  doc.text(`DNI / RUC: ${orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc}`, 18, boxY + 29);
 
-  // Generar y descargar el PDF
-  doc.save(`${ticket.codigoDT}_Constancia.pdf`);
+  // Recuadro Firma Técnico Responsable
+  doc.rect(108, boxY, 88, 32);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FIRMA DEL TÉCNICO RESPONSABLE', 112, boxY + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Técnico: ${orden.intervencion.tecnicoAsignado || 'Técnico Especialista'}`, 112, boxY + 24);
+  doc.text('MUR TECNOLOGIA S.A.C. - Laboratorio Técnico', 112, boxY + 29);
+
+  // Pie de página
+  const pageHeight = doc.internal.pageSize.height;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...primaryColor);
+  doc.text('MUR TECNOLOGÍA S.A.C.  |  Informe Técnico de Servicio  |  Lima - Perú', 14, pageHeight - 8);
+
+  // Guardar PDF como _InformeTecnico.pdf
+  doc.save(`${orden.codigoDT}_InformeTecnico.pdf`);
 };
+
+// Alias para retrocompatibilidad
+export const generarConstanciaAtencion = generarInformeTecnico;
