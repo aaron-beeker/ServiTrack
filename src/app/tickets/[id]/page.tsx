@@ -22,6 +22,7 @@ import {
 } from "@/types"
 import { generarInformeDiagnostico } from "@/lib/pdf/InformeDT"
 import { generarInformeTecnico } from "@/lib/pdf/Constancia"
+import { MurLogo } from "@/components/brand/MurLogo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -470,34 +471,36 @@ export default function DetalleOrdenPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 p-6 md:p-10 max-w-7xl mx-auto space-y-8 font-sans">
+    <div className="min-h-screen bg-[#090E17] text-slate-100 p-6 md:p-10 max-w-7xl mx-auto space-y-8 font-sans">
       
       {/* Barra Superior con Navegación y Acciones */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-[#2369A1]/20">
         <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
             size="icon" 
             onClick={() => router.push('/')} 
-            className="border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+            className="border-slate-800 bg-[#0F1A2C] hover:bg-[#192A45] text-slate-300 rounded-xl"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
             <div className="flex items-center gap-3">
+              <MurLogo size="sm" showSubtitle={false} />
+              <span className="text-slate-600">|</span>
               <h1 className="text-2xl font-bold text-slate-100 font-mono tracking-tight">
                 Orden {orden.codigoDT}
               </h1>
               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                 orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                 orden.estadoGeneral === 'REPARADO' ? 'bg-teal-500/10 text-teal-400 border-teal-500/30' :
-                orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-[#2369A1]/15 text-[#38BDF8] border-[#2369A1]/30' :
                 orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
                 orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
                 orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
                 orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' :
                 orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
-                orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-[#2369A1]/15 text-[#38BDF8] border-[#2369A1]/30' :
                 'bg-amber-500/10 text-amber-400 border-amber-500/30'
               }`}>
                 {orden.estadoGeneral}

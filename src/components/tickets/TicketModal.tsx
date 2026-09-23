@@ -216,31 +216,31 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
         children ? (
           children as any
         ) : (
-          <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-900/25 rounded-xl">
+          <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white shadow-lg shadow-[#2369A1]/25 rounded-xl">
             <PlusCircle className="mr-2 h-4 w-4" />
             Nueva Orden DT
           </Button>
         )
       } />
 
-      <DialogContent className="sm:max-w-[760px] max-h-[92vh] flex flex-col bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="sm:max-w-[760px] max-h-[92vh] flex flex-col bg-[#0B1320] border border-[#2369A1]/30 text-slate-100 p-0 overflow-hidden shadow-2xl">
         
         {/* Cabecera Modal */}
-        <div className="p-6 pb-4 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md">
+        <div className="p-6 pb-4 border-b border-[#2369A1]/20 bg-[#0F1A2C]/80 backdrop-blur-md">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                <span className="p-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                <span className="p-2 rounded-lg bg-[#2369A1]/20 text-[#38BDF8] border border-[#2369A1]/40">
                   <Laptop className="w-5 h-5" />
                 </span>
                 ETAPA 1: Registro de Ingreso Técnico
               </DialogTitle>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 font-semibold border border-blue-500/20">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-[#2369A1]/15 text-[#38BDF8] font-semibold border border-[#2369A1]/30">
                 Estado Inicial: REGISTRADO
               </span>
             </div>
             <DialogDescription className="text-slate-400 text-xs mt-1">
-              Registro formal de recepción de equipo en taller. Valida automáticamente duplicidad de series activas.
+              MUR Tecnología • Laboratorio Central de Servicio Técnico. Validación de serie en taller.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -509,7 +509,7 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
             <Button
               type="submit"
               disabled={guardando || !!ordenActivaBloqueante}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium px-6 py-2 rounded-xl shadow-lg shadow-blue-900/30"
+              className="bg-[#2369A1] hover:bg-[#1E578A] text-white font-medium px-6 py-2 rounded-xl shadow-lg shadow-[#2369A1]/30 transition-colors"
             >
               {guardando ? (
                 <>

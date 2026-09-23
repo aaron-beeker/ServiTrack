@@ -20,9 +20,15 @@ import {
   RefreshCw, 
   Search, 
   Laptop, 
-  ChevronRight 
+  ChevronRight,
+  Shield,
+  PhoneCall,
+  MapPin,
+  ExternalLink,
+  Layers
 } from "lucide-react"
 import { TicketModal } from "@/components/tickets/TicketModal"
+import { MurLogo } from "@/components/brand/MurLogo"
 import { getOrdenesServicio } from "@/services/ordenServicioService"
 import { OrdenServicio } from "@/types"
 
@@ -49,7 +55,7 @@ export default function Dashboard() {
     cargarOrdenes()
   }, [])
 
-  // Métricas calculadas según el nuevo ciclo operativo oficial
+  // Métricas calculadas según el ciclo operativo de taller
   const registrados = ordenes.filter(t => t.estadoGeneral === 'REGISTRADO').length
   const enDiagnostico = ordenes.filter(t => ['EN_DIAGNOSTICO', 'DIAGNOSTICADO', 'DIAGNOSTICADO_NO_APROBADO'].includes(t.estadoGeneral)).length
   const enTaller = ordenes.filter(t => ['APROBADO_PARA_REPARACION', 'EN_REPARACION', 'OBSERVADO'].includes(t.estadoGeneral)).length
@@ -77,33 +83,60 @@ export default function Dashboard() {
   })
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#090E17] text-slate-100 overflow-hidden font-sans">
       
-      {/* Sidebar - Glassmorphism */}
-      <aside className="w-64 flex flex-col backdrop-blur-2xl bg-slate-900/60 border-r border-slate-800/50 p-6 relative z-10">
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Wrench className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400 tracking-tight">ServiTrack</h1>
-            <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">MUR Tecnología</p>
+      {/* Sidebar Corporativo - MUR Tecnología */}
+      <aside className="w-72 flex flex-col bg-[#0B1320] border-r border-[#2369A1]/20 p-6 relative z-10 select-none">
+        
+        {/* Brand Header con Logo Oficial */}
+        <div className="mb-8">
+          <MurLogo size="md" />
+          <div className="mt-3 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#2369A1]/10 border border-[#2369A1]/25 text-[10px] text-[#38BDF8] font-medium">
+            <Shield className="w-3 h-3 text-[#38BDF8]" />
+            <span>Calidad & Soporte Especializado</span>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          <NavItem href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active />
-          <NavItem href="/tickets" icon={<Wrench size={18} />} label="Órdenes de Servicio" />
-        </nav>
+        {/* Navegación Principal */}
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">
+            Operaciones Taller
+          </p>
+          <NavItem href="/" icon={<LayoutDashboard size={18} />} label="Panel de Control" active />
+          <NavItem href="/tickets" icon={<Layers size={18} />} label="Órdenes de Servicio" />
+        </div>
 
-        <div className="mt-auto pt-4 border-t border-slate-800/50">
-          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-slate-300">Base de Datos</p>
-            <p className="text-[11px] text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Firestore Activo
-            </p>
-            <p className="text-[10px] text-slate-500 font-mono">ordenes_servicio</p>
+        {/* Enlace Externo Corporativo */}
+        <div className="mt-6 pt-4 border-t border-slate-800/80 space-y-2">
+          <a
+            href="https://www.mur-tecno.com.pe/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-slate-200 hover:bg-[#132238] transition-colors group"
+          >
+            <span>Sitio Web Oficial</span>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-[#38BDF8] transition-colors" />
+          </a>
+        </div>
+
+        {/* Footer Sidebar con Información Corporativa Oficial */}
+        <div className="mt-auto pt-4 border-t border-slate-800/80 space-y-3">
+          <div className="text-[11px] text-slate-400 space-y-1.5">
+            <div className="flex items-start gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#2369A1] shrink-0 mt-0.5" />
+              <span>Av. Benavides 3082, Of. 503 • Miraflores</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-[#2369A1] shrink-0" />
+              <span>(+51) 944 590 999</span>
+            </div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[#0F1A2C] border border-[#2369A1]/20 flex items-center justify-between text-[10px]">
+            <span className="text-slate-400 font-mono">SRT v2.4</span>
+            <span className="text-emerald-400 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Taller En Línea
+            </span>
           </div>
         </div>
       </aside>
@@ -111,31 +144,34 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-y-auto">
         
-        {/* Background Decorative Gradients */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+        {/* Glow corporativo sutil de fondo */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#2369A1]/8 rounded-full blur-[140px] pointer-events-none" />
 
-        {/* Header */}
-        <header className="h-20 flex items-center justify-between px-10 border-b border-slate-800/50 backdrop-blur-md bg-slate-950/60 sticky top-0 z-10">
+        {/* Header Corporativo Minimalista */}
+        <header className="h-20 flex items-center justify-between px-10 border-b border-[#2369A1]/20 bg-[#0B1320]/80 backdrop-blur-md sticky top-0 z-10">
           <div>
-            <h2 className="text-2xl font-bold text-slate-100">Control de Atenciones Técnicas (SRT)</h2>
-            <p className="text-xs text-slate-400">MUR Tecnología S.A.C. • Mesa de Ayuda y Laboratorio de Hardware</p>
+            <h2 className="text-xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
+              Sistema de Control de Atenciones Técnicas
+            </h2>
+            <p className="text-xs text-slate-400">
+              MUR Tecnología S.A.C. • RUC: 20603786301
+            </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Button 
               variant="outline" 
               size="icon" 
               onClick={cargarOrdenes} 
               disabled={loading}
-              className="border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+              className="border-slate-800 bg-[#0F1A2C] hover:bg-[#192A45] text-slate-300"
               title="Recargar órdenes"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#38BDF8]' : ''}`} />
             </Button>
             <TicketModal onSuccess={() => cargarOrdenes()}>
-              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-900/20 rounded-xl transition-all duration-300 hover:scale-105">
+              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white shadow-lg shadow-[#2369A1]/25 rounded-xl transition-all duration-200">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Nuevo Ingreso (DT)
+                Nueva Orden de Servicio
               </Button>
             </TicketModal>
           </div>
@@ -144,64 +180,60 @@ export default function Dashboard() {
         {/* Dashboard Content */}
         <div className="p-10 space-y-8 relative z-10">
           
-          {/* Stats Cards (4 etapas del flujo) */}
+          {/* Tarjetas de Métricas - Estilo Minimalista y Corporativo */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard 
-              title="1. Registrados / Ingreso" 
+              title="1. RECEPCIÓN & INGRESO" 
               value={registrados.toString()} 
               icon={<Clock className="w-5 h-5 text-amber-400" />} 
-              trend="Pendiente revisión técnica"
-              trendUp={true}
-              borderColor="border-amber-500/20"
-              bgColor="bg-amber-500/5"
+              subtext="Pendiente revisión técnica"
+              accentColor="border-amber-500/20 bg-amber-500/5"
             />
             <StatCard 
-              title="2. En Diagnóstico / Propuesta" 
+              title="2. DIAGNÓSTICO & PROPUESTA" 
               value={enDiagnostico.toString()} 
-              icon={<AlertCircle className="w-5 h-5 text-blue-400" />} 
-              trend="Evaluación y aprobación cliente"
-              borderColor="border-blue-500/20"
-              bgColor="bg-blue-500/5"
+              icon={<AlertCircle className="w-5 h-5 text-[#38BDF8]" />} 
+              subtext="Evaluación y aprobación cliente"
+              accentColor="border-[#2369A1]/30 bg-[#2369A1]/5"
             />
             <StatCard 
-              title="3. En Taller / Reparación" 
+              title="3. EN INTERVENCIÓN & QA" 
               value={enTaller.toString()} 
               icon={<Wrench className="w-5 h-5 text-purple-400" />} 
-              trend="Intervención física y QA"
-              borderColor="border-purple-500/20"
-              bgColor="bg-purple-500/5"
+              subtext="Reparación física y pruebas"
+              accentColor="border-purple-500/20 bg-purple-500/5"
             />
             <StatCard 
-              title="4. Concluidos / Cierre" 
+              title="4. CERRADOS & ENTREGADOS" 
               value={concluidos.toString()} 
               icon={<CheckCircle2 className="w-5 h-5 text-emerald-400" />} 
-              trend="Entregados o cerrados"
-              trendUp={true}
-              borderColor="border-emerald-500/20"
-              bgColor="bg-emerald-500/5"
+              subtext="Concluidos con constancia"
+              accentColor="border-emerald-500/20 bg-emerald-500/5"
             />
           </div>
 
-          {/* Activity Section with Live Filter Controls */}
-          <Card className="bg-slate-900/60 border-slate-800/60 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden">
-            <CardHeader className="border-b border-slate-800/50 pb-4">
+          {/* Tabla de Actividad Principal */}
+          <Card className="bg-[#0F1A2C]/80 border-[#2369A1]/20 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden">
+            <CardHeader className="border-b border-[#2369A1]/15 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <CardTitle className="text-lg font-medium text-slate-200">Órdenes de Servicio en Taller</CardTitle>
-                  <CardDescription className="text-slate-400 text-xs">
-                    Gestión transaccional en tiempo real desde la colección <span className="font-mono text-blue-400">ordenes_servicio</span>.
+                  <CardTitle className="text-base font-semibold text-slate-100">
+                    Órdenes de Atención Técnica
+                  </CardTitle>
+                  <CardDescription className="text-slate-400 text-xs mt-0.5">
+                    Registro centralizado de equipos en laboratorio de MUR Tecnología.
                   </CardDescription>
                 </div>
                 
-                {/* Search Bar */}
-                <div className="relative w-full sm:w-72">
-                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                {/* Search Bar Minimalista */}
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Buscar DT, Serie, RUC, Cliente..."
+                    placeholder="Buscar por DT, S/N de serie, RUC, cliente..."
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-full pl-10 pr-4 py-2 text-xs bg-[#090E17] border border-slate-800 rounded-xl text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#2369A1] transition-colors"
                   />
                 </div>
               </div>
@@ -210,18 +242,18 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 pt-3 flex-wrap">
                 {[
                   { id: 'TODOS', label: 'Todas las Órdenes' },
-                  { id: 'REGISTRADO', label: 'Registrados' },
-                  { id: 'DIAGNOSTICO', label: 'Diagnóstico & Propuesta' },
-                  { id: 'REPARACION', label: 'En Taller / QA' },
-                  { id: 'ENTREGADO', label: 'Concluidos / Entregados' }
+                  { id: 'REGISTRADO', label: '1. Registrados' },
+                  { id: 'DIAGNOSTICO', label: '2. En Diagnóstico' },
+                  { id: 'REPARACION', label: '3. En Taller / QA' },
+                  { id: 'ENTREGADO', label: '4. Concluidos' }
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setFiltroEstado(tab.id)}
-                    className={`text-xs px-3 py-1 rounded-lg font-medium transition-all ${
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
                       filtroEstado === tab.id
-                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                        ? 'bg-[#2369A1] text-white shadow-sm font-semibold'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-[#142238] bg-[#090E17] border border-slate-800/80'
                     }`}
                   >
                     {tab.label}
@@ -233,45 +265,45 @@ export default function Dashboard() {
             <CardContent className="p-0">
               {loading ? (
                 <div className="p-12 text-center text-slate-500 flex flex-col items-center gap-2">
-                  <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-                  <span>Cargando órdenes desde Firestore...</span>
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#2369A1]" />
+                  <span className="text-xs">Sincronizando órdenes con Firestore...</span>
                 </div>
               ) : ordenesFiltradas.length === 0 ? (
                 <div className="p-12 text-center text-slate-500 space-y-3">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-slate-800/40 flex items-center justify-center">
-                    <Laptop className="w-8 h-8 text-slate-600" />
+                  <div className="w-14 h-14 mx-auto rounded-full bg-[#132238] flex items-center justify-center">
+                    <Laptop className="w-7 h-7 text-slate-500" />
                   </div>
-                  <p className="text-sm">
-                    {busqueda ? `No se encontraron resultados para "${busqueda}".` : "No hay órdenes técnicas registradas."}
+                  <p className="text-xs">
+                    {busqueda ? `No se encontraron resultados para "${busqueda}".` : "No hay órdenes técnicas en este estado."}
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-800/50">
+                <div className="divide-y divide-[#2369A1]/15">
                   {ordenesFiltradas.map(orden => (
                     <div 
                       key={orden.codigoDT} 
                       onClick={() => router.push(`/tickets/${orden.codigoDT}`)}
-                      className="p-4 hover:bg-slate-800/30 flex items-center justify-between cursor-pointer transition-colors group"
+                      className="p-4 hover:bg-[#142238]/60 flex items-center justify-between cursor-pointer transition-colors group"
                     >
                       <div className="flex items-center gap-4">
                         <div className={`w-2.5 h-2.5 rounded-full ${
-                          orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' :
-                          orden.estadoGeneral === 'REPARADO' ? 'bg-teal-400 shadow-sm shadow-teal-400/50' :
-                          orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-blue-400 shadow-sm shadow-blue-400/50' :
-                          orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500 shadow-sm shadow-rose-500/50' :
-                          orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500 shadow-sm shadow-rose-500/50' :
-                          orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500 shadow-sm shadow-amber-500/50' :
-                          orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500 shadow-sm shadow-purple-500/50' :
-                          orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-400 shadow-sm shadow-indigo-400/50' :
-                          orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-blue-400 shadow-sm shadow-blue-400/50' :
+                          orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500' :
+                          orden.estadoGeneral === 'REPARADO' ? 'bg-teal-400' :
+                          orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-[#38BDF8]' :
+                          orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500' :
+                          orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500' :
+                          orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500' :
+                          orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500' :
+                          orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-400' :
+                          orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-blue-400' :
                           'bg-amber-500'
                         }`} />
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-100 group-hover:text-blue-400 transition-colors font-mono">
+                            <p className="font-semibold text-slate-100 group-hover:text-[#38BDF8] transition-colors font-mono text-sm">
                               {orden.codigoDT}
                             </p>
-                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">•</span>
                             <span className="text-xs text-slate-300 font-medium">
                               {orden.ingreso.cliente.razonSocial}
                             </span>
@@ -283,21 +315,21 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
-                          orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                          orden.estadoGeneral === 'REPARADO' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' :
-                          orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                          orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                          orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                          orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                          orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                          orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                          orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                          'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${
+                          orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' :
+                          orden.estadoGeneral === 'REPARADO' ? 'bg-teal-500/10 text-teal-400 border-teal-500/25' :
+                          orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-[#2369A1]/20 text-[#38BDF8] border-[#2369A1]/40' :
+                          orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' :
+                          orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' :
+                          orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' :
+                          orden.estadoGeneral === 'EN_REPARACION' ? 'bg-purple-500/10 text-purple-400 border-purple-500/25' :
+                          orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' :
+                          orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-blue-500/10 text-blue-400 border-blue-500/25' :
+                          'bg-amber-500/10 text-amber-400 border-amber-500/25'
                         }`}>
                           {orden.estadoGeneral}
                         </span>
-                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
+                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-[#38BDF8] group-hover:translate-x-1 transition-all" />
                       </div>
                     </div>
                   ))}
@@ -317,15 +349,15 @@ function NavItem({ icon, label, href, active = false }: { icon: React.ReactNode,
   return (
     <div 
       onClick={(e) => { e.preventDefault(); router.push(href) }}
-      className={`cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group
+      className={`cursor-pointer flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group
         ${active 
-          ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_1px_0_0_rgba(148,163,184,0.1)]' 
-          : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+          ? 'bg-[#2369A1] text-white shadow-sm font-semibold' 
+          : 'text-slate-400 hover:bg-[#132238] hover:text-slate-200'}`}
     >
-      <div className={`transition-transform duration-300 group-hover:scale-110 ${active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
+      <div className={`transition-transform duration-200 ${active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`}>
         {icon}
       </div>
-      <span className="font-medium text-sm">{label}</span>
+      <span className="text-xs font-medium">{label}</span>
     </div>
   )
 }
@@ -334,25 +366,23 @@ interface StatCardProps {
   title: string
   value: string
   icon: React.ReactNode
-  trend: string
-  trendUp?: boolean
-  borderColor: string
-  bgColor: string
+  subtext: string
+  accentColor: string
 }
 
-function StatCard({ title, value, icon, trend, trendUp, borderColor, bgColor }: StatCardProps) {
+function StatCard({ title, value, icon, subtext, accentColor }: StatCardProps) {
   return (
-    <div className={`rounded-2xl border ${borderColor} ${bgColor} backdrop-blur-md p-6 flex flex-col justify-between group hover:-translate-y-1 hover:shadow-lg transition-all duration-300`}>
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-slate-400 font-medium text-xs">{title}</h3>
-        <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/50 shadow-inner group-hover:scale-110 transition-transform duration-300">
+    <div className={`rounded-2xl border ${accentColor} p-5 flex flex-col justify-between group hover:-translate-y-0.5 transition-all duration-200 shadow-sm`}>
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-slate-400 font-semibold text-[10px] tracking-wider uppercase">{title}</h3>
+        <div className="p-2 rounded-lg bg-[#0B1320] border border-slate-800/80 shadow-inner">
           {icon}
         </div>
       </div>
       <div>
-        <div className="text-3xl font-bold text-slate-100 tracking-tight mb-1">{value}</div>
-        <div className={`text-[11px] font-medium ${trendUp === true ? 'text-emerald-400' : trendUp === false ? 'text-rose-400' : 'text-slate-400'}`}>
-          {trend}
+        <div className="text-3xl font-extrabold text-slate-100 tracking-tight mb-1">{value}</div>
+        <div className="text-[11px] text-slate-400">
+          {subtext}
         </div>
       </div>
     </div>
