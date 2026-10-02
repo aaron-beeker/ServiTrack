@@ -124,13 +124,15 @@ export type Ticket = OrdenServicio;
 export type EstadoTicket = EstadoGeneral;
 export interface Cliente extends ClienteOrden {
   id?: string;
-  clienteId: string;
-  nombreContacto: string;
-  createdAt?: Date;
+  clienteId?: string;
+  nombreContacto?: string;
+  direccion?: string;
+  creadoEl?: string;
+  createdAt?: any;
 }
 export interface Equipo extends EquipoOrden {
   id?: string;
-  tipo: string;
+  tipo?: string;
   clienteId?: string;
   historialTickets?: string[];
 }
@@ -139,4 +141,5 @@ export interface ModeloEquipo {
   nombre: string;
   marca: string;
   tipo: string;
+  partNumberSugerido?: string;
 }

@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { UsuarioSistema } from '@/types';
 
@@ -27,9 +27,9 @@ export const getUsuariosSistema = async (): Promise<UsuarioSistema[]> => {
     const snapshot = await getDocs(ref);
 
     if (!snapshot.empty) {
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      return snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
       } as UsuarioSistema));
     }
 
@@ -37,5 +37,28 @@ export const getUsuariosSistema = async (): Promise<UsuarioSistema[]> => {
   } catch (err) {
     console.warn('Advertencia al consultar usuarios en Firestore, usando usuarios base:', err);
     return DEFAULT_USUARIOS;
+  }
+};
+
+export const createUsuarioSistema = async (usuario: Omit<UsuarioSistema, 'id'>): Promise<UsuarioSistema> => {
+  try {
+    const cleanId = usuario.correo.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '') || `user-${Date.now()}`;
+    const docRef = doc(db, 'usuarios', cleanId);
+    const nuevoUsuario: UsuarioSistema = {
+      id: cleanId,
+      nombreCompleto: usuario.nombreCompleto.trim(),
+      correo: usuario.correo.trim(),
+      rol: usuario.rol || 'TECNICO',
+      cargo: usuario.cargo.trim(),
+      activo: usuario.activo ?? true
+    };
+    await setDoc(docRef, nuevoUsuario);
+    return nuevoUsuario;
+  } catch (err) {
+    console.error('Error al guardar usuario en Firestore:', err);
+    return {
+      id: `local-${Date.now()}`,
+      ...usuario
+    };
   }
 };

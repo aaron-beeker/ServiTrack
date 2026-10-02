@@ -52,7 +52,7 @@ export default function TicketsList() {
       {/* Top Bar */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <button 
               onClick={() => router.push('/')} 
               className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70"
@@ -60,8 +60,26 @@ export default function TicketsList() {
               <ArrowLeft className="w-4 h-4" />
             </button>
             <MurLogo size="sm" showSubtitle={false} />
-            <span className="text-slate-300">/</span>
-            <span className="text-sm font-semibold text-slate-900">Órdenes de Servicio</span>
+            <nav className="hidden md:flex items-center gap-1 border-l border-slate-200 pl-6">
+              <button 
+                onClick={() => router.push('/')}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Panel de Control
+              </button>
+              <button 
+                onClick={() => router.push('/tickets')}
+                className="px-3 py-1.5 text-xs font-semibold text-[#2369A1] bg-[#2369A1]/8 rounded-md"
+              >
+                Órdenes de Servicio
+              </button>
+              <button 
+                onClick={() => router.push('/clientes')}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Clientes Corporativos
+              </button>
+            </nav>
           </div>
 
           <div className="flex items-center gap-3">
