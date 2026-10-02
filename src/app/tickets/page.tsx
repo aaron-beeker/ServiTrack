@@ -9,8 +9,10 @@ import { ArrowLeft, Search, Laptop, RefreshCw, ChevronRight } from "lucide-react
 import { TicketModal } from "@/components/tickets/TicketModal"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
+import { useAuth } from "@/context/AuthContext"
 
 export default function TicketsList() {
+  const { esAdmin } = useAuth()
   const [ordenes, setOrdenes] = useState<OrdenServicio[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState("")
@@ -80,6 +82,14 @@ export default function TicketsList() {
               >
                 Clientes Corporativos
               </button>
+              {esAdmin && (
+                <button 
+                  onClick={() => router.push('/usuarios')}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  Gestión de Usuarios
+                </button>
+              )}
             </nav>
           </div>
 

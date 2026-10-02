@@ -19,7 +19,7 @@ import {
 
 export function UserMenu() {
   const router = useRouter()
-  const { user, perfil, rol, logout, cambiarRol, loading } = useAuth()
+  const { user, perfil, rol, esAdmin, logout, cambiarRol, loading } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -157,6 +157,21 @@ export function UserMenu() {
 
           {/* Opciones */}
           <div className="py-1">
+            {esAdmin && (
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  router.push('/usuarios')
+                }}
+                className="w-full text-left px-4 py-2 text-[#2369A1] font-semibold hover:bg-blue-50 flex items-center justify-between border-b border-slate-100"
+              >
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#2369A1]" />
+                  Gestión de Usuarios (Roles)
+                </span>
+                <ArrowRight className="w-3 h-3 text-[#2369A1]" />
+              </button>
+            )}
             <button
               onClick={() => {
                 setMenuOpen(false)

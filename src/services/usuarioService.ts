@@ -1,14 +1,22 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { UsuarioSistema, RolUsuario } from '@/types';
 
 export const DEFAULT_USUARIOS: UsuarioSistema[] = [
   {
+    id: "beeker147",
+    nombreCompleto: "Beeker Aarón Valdéz Mattos",
+    correo: "beeker147@gmail.com",
+    rol: "ADMIN",
+    cargo: "Administrador de Operaciones y TI",
+    activo: true
+  },
+  {
     id: "beeker.valdez",
     nombreCompleto: "Beeker Aarón Valdéz Mattos",
     correo: "aarón.valdez@murtecnologia.com",
     rol: "ADMIN",
-    cargo: "Administrador / Operaciones",
+    cargo: "Jefatura de Operaciones",
     activo: true
   },
   {
@@ -35,10 +43,18 @@ export const getUsuariosSistema = async (): Promise<UsuarioSistema[]> => {
     const snapshot = await getDocs(ref);
 
     if (!snapshot.empty) {
-      return snapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data()
+      const docs = snapshot.docs.map(docSnap => ({
+        ...docSnap.data(),
+        id: docSnap.id
       } as UsuarioSistema));
+      
+      // Asegurar que beeker147@gmail.com siempre esté presente si no se ha sincronizado aún
+      const existeBeeker = docs.some(u => u.correo.toLowerCase() === 'beeker147@gmail.com');
+      if (!existeBeeker) {
+        docs.unshift(DEFAULT_USUARIOS[0]);
+      }
+
+      return docs;
     }
 
     return DEFAULT_USUARIOS;
@@ -104,7 +120,7 @@ export const createUsuarioSistema = async (usuario: Omit<UsuarioSistema, 'id'>):
 
 /**
  * Sincroniza un usuario autenticado vía Google con el catálogo de Firestore.
- * Si ya existe, retorna su perfil. Si no, lo registra con el rol inicial asignado.
+ * Si es beeker147@gmail.com, se le asigna de forma forzada e inequívoca el rol ADMIN.
  */
 export const syncUsuarioGoogle = async (
   googleUser: {
@@ -116,32 +132,40 @@ export const syncUsuarioGoogle = async (
   rolSugerido: RolUsuario = 'VENTAS'
 ): Promise<UsuarioSistema> => {
   const correo = googleUser.email.trim().toLowerCase();
+  const esBeekerAdmin = correo === 'beeker147@gmail.com';
   
   // 1. Verificar si ya existe por correo
   const existente = await getUsuarioPorCorreo(correo);
   if (existente) {
-    // Si no tiene foto y Google la provee, actualizarla en background
-    if (!existente.fotoUrl && googleUser.photoURL) {
-      try {
-        const docRef = doc(db, 'usuarios', existente.id);
-        await updateDoc(docRef, { fotoUrl: googleUser.photoURL });
-      } catch (e) {
-        // Silencioso
-      }
+    let rolFinal = esBeekerAdmin ? 'ADMIN' : existente.rol;
+    let cargoFinal = esBeekerAdmin ? 'Administrador de Operaciones y TI' : existente.cargo;
+
+    try {
+      const docRef = doc(db, 'usuarios', existente.id);
+      await updateDoc(docRef, { 
+        fotoUrl: googleUser.photoURL || existente.fotoUrl || '',
+        rol: rolFinal,
+        cargo: cargoFinal
+      });
+    } catch (e) {
+      // Silencioso
     }
+
     return {
       ...existente,
+      rol: rolFinal,
+      cargo: cargoFinal,
       fotoUrl: googleUser.photoURL || existente.fotoUrl
     };
   }
 
-  // 2. Si no existe, determinar rol por defecto o el sugerido
+  // 2. Si no existe, determinar rol
   let rol: RolUsuario = rolSugerido;
   let cargo = 'Asesor Comercial / Ventas';
 
-  if (correo.includes('admin') || correo.includes('valdez') || correo.includes('aaron')) {
+  if (esBeekerAdmin || correo.includes('admin') || correo.includes('valdez') || correo.includes('aaron')) {
     rol = 'ADMIN';
-    cargo = 'Administrador de Operaciones';
+    cargo = 'Administrador de Operaciones y TI';
   } else if (correo.includes('soporte') || correo.includes('tecnico') || rolSugerido === 'TECNICO') {
     rol = 'TECNICO';
     cargo = 'Técnico de Laboratorio';
@@ -151,7 +175,7 @@ export const syncUsuarioGoogle = async (
   }
 
   return await createUsuarioSistema({
-    nombreCompleto: googleUser.displayName || correo.split('@')[0],
+    nombreCompleto: googleUser.displayName || (esBeekerAdmin ? 'Beeker Aarón Valdéz Mattos' : correo.split('@')[0]),
     correo,
     rol,
     cargo,
@@ -166,6 +190,16 @@ export const actualizarRolUsuario = async (id: string, nuevoRol: RolUsuario): Pr
     await updateDoc(docRef, { rol: nuevoRol });
   } catch (err) {
     console.error('Error al actualizar rol de usuario:', err);
+    throw err;
+  }
+};
+
+export const deleteUsuarioSistema = async (id: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'usuarios', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
     throw err;
   }
 };

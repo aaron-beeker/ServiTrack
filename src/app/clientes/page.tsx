@@ -23,12 +23,14 @@ import {
 } from "lucide-react"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
+import { useAuth } from "@/context/AuthContext"
 import { getAllClientes, createCliente, updateCliente, deleteCliente } from "@/services/clienteService"
 import { Cliente } from "@/types"
 import { toast } from "sonner"
 
 export default function ClientesPage() {
   const router = useRouter()
+  const { esAdmin } = useAuth()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState("")
@@ -203,6 +205,14 @@ export default function ClientesPage() {
               >
                 Clientes Corporativos
               </button>
+              {esAdmin && (
+                <button 
+                  onClick={() => router.push('/usuarios')}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  Gestión de Usuarios
+                </button>
+              )}
             </nav>
           </div>
 

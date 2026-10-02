@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { 
   User, 
   GoogleAuthProvider, 
@@ -10,7 +11,7 @@ import {
 } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { UsuarioSistema, RolUsuario } from "@/types"
-import { syncUsuarioGoogle, getUsuarioPorCorreo, DEFAULT_USUARIOS } from "@/services/usuarioService"
+import { syncUsuarioGoogle, DEFAULT_USUARIOS } from "@/services/usuarioService"
 import { toast } from "sonner"
 
 interface AuthContextType {
@@ -18,6 +19,7 @@ interface AuthContextType {
   perfil: UsuarioSistema | null
   rol: RolUsuario
   loading: boolean
+  isAuthenticated: boolean
   loginConGoogle: (rolInicial?: RolUsuario) => Promise<void>
   loginDemo: (rol: RolUsuario) => void
   logout: () => Promise<void>
@@ -32,11 +34,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const STORAGE_KEY_DEMO = "servitrack_demo_user"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [perfil, setPerfil] = useState<UsuarioSistema | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Cargar usuario inicial (Firebase Auth o Demo guardado en localStorage)
+  // Cargar usuario inicial (Firebase Auth o Sesión activa)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
@@ -55,19 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null)
-        // Revisar si había una sesión demo activa
+        // Revisar si había una sesión demo/manual activa
         try {
           const stored = localStorage.getItem(STORAGE_KEY_DEMO)
           if (stored) {
             const demoUser = JSON.parse(stored) as UsuarioSistema
             setPerfil(demoUser)
           } else {
-            // Por defecto en desarrollo, iniciar como Administrador para que el flujo sea accesible
-            const defaultAdmin = DEFAULT_USUARIOS[0]
-            setPerfil(defaultAdmin)
+            setPerfil(null)
           }
         } catch (e) {
-          setPerfil(DEFAULT_USUARIOS[0])
+          setPerfil(null)
         }
       }
       setLoading(false)
@@ -75,6 +77,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe()
   }, [])
+
+  // Protección de rutas: Si no está autenticado y no está en /login, redirigir a /login
+  useEffect(() => {
+    if (!loading) {
+      if (!perfil && pathname !== '/login') {
+        router.push('/login')
+      }
+    }
+  }, [loading, perfil, pathname, router])
 
   // Inicio de sesión con Google (Gmail)
   const loginConGoogle = async (rolInicial: RolUsuario = 'VENTAS') => {
@@ -100,13 +111,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPerfil(perfilSync)
         localStorage.removeItem(STORAGE_KEY_DEMO)
         toast.success(`Bienvenido, ${perfilSync.nombreCompleto} (${perfilSync.rol})`)
+        router.push("/")
       }
     } catch (err: any) {
       console.error("Error al iniciar sesión con Google:", err)
       if (err.code === 'auth/popup-closed-by-user') {
         toast.info("Inicio de sesión cancelado.")
       } else {
-        toast.error(err.message || "Error al autenticar con Google. Verifique los permisos en Firebase.")
+        toast.error(err.message || "Error al autenticar con Google. Verifique su conexión.")
       }
       throw err
     } finally {
@@ -116,32 +128,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Inicio de sesión demo (para pruebas rápidas de roles)
   const loginDemo = (rolDeseado: RolUsuario) => {
-    const demo = DEFAULT_USUARIOS.find(u => u.rol === rolDeseado) || {
-      id: `demo-${rolDeseado.toLowerCase()}`,
-      nombreCompleto: rolDeseado === 'ADMIN' ? 'Beeker Aarón Valdéz Mattos' : rolDeseado === 'TECNICO' ? 'Kevin Quispe' : 'María Elena Torres',
-      correo: rolDeseado === 'ADMIN' ? 'admin@murtecnologia.com' : rolDeseado === 'TECNICO' ? 'tecnico@murtecnologia.com' : 'ventas@murtecnologia.com',
-      rol: rolDeseado,
-      cargo: rolDeseado === 'ADMIN' ? 'Administrador de Operaciones' : rolDeseado === 'TECNICO' ? 'Técnico de Laboratorio' : 'Asesora Comercial / Ventas',
-      activo: true
+    let demo: UsuarioSistema
+    if (rolDeseado === 'ADMIN') {
+      demo = DEFAULT_USUARIOS[0] // beeker147@gmail.com
+    } else {
+      demo = DEFAULT_USUARIOS.find(u => u.rol === rolDeseado) || {
+        id: `demo-${rolDeseado.toLowerCase()}`,
+        nombreCompleto: rolDeseado === 'TECNICO' ? 'Kevin Quispe' : 'María Elena Torres',
+        correo: rolDeseado === 'TECNICO' ? 'kevin.soporte@murtecnologia.com' : 'ventas@murtecnologia.com',
+        rol: rolDeseado,
+        cargo: rolDeseado === 'TECNICO' ? 'Técnico de Laboratorio' : 'Asesora Comercial / Ventas',
+        activo: true
+      }
     }
 
     setPerfil(demo)
     localStorage.setItem(STORAGE_KEY_DEMO, JSON.stringify(demo))
-    toast.success(`Sesión iniciada con rol: ${rolDeseado}`)
+    toast.success(`Sesión iniciada como: ${demo.nombreCompleto} (${demo.rol})`)
+    router.push("/")
   }
 
-  // Cerrar sesión
+  // Cerrar sesión completamente
   const logout = async () => {
+    setLoading(true)
     try {
       await firebaseSignOut(auth)
     } catch (e) {
-      // Ignorar si no había sesión de firebase activa
+      // Ignorar si no había sesión en Firebase
     }
     setUser(null)
-    localStorage.removeItem(STORAGE_KEY_DEMO)
-    // Mantener un usuario invitado o limpiar
     setPerfil(null)
+    localStorage.removeItem(STORAGE_KEY_DEMO)
+    setLoading(false)
     toast.info("Sesión cerrada correctamente.")
+    router.push('/login')
   }
 
   // Alternar rol activo (simulación / pruebas de interfaz)
@@ -150,14 +170,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const actualizado: UsuarioSistema = {
       ...perfil,
       rol: nuevoRol,
-      cargo: nuevoRol === 'ADMIN' ? 'Administrador de Operaciones' : nuevoRol === 'TECNICO' ? 'Técnico de Laboratorio' : 'Asesor Comercial / Ventas'
+      cargo: nuevoRol === 'ADMIN' ? 'Administrador de Operaciones y TI' : nuevoRol === 'TECNICO' ? 'Técnico de Laboratorio' : 'Asesor Comercial / Ventas'
     }
     setPerfil(actualizado)
     localStorage.setItem(STORAGE_KEY_DEMO, JSON.stringify(actualizado))
     toast.info(`Rol activo cambiado a: ${nuevoRol}`)
   }
 
-  const rolActual = perfil?.rol || 'ADMIN'
+  const rolActual = perfil?.rol || 'VENTAS'
+  const isAuthenticated = !!perfil
 
   return (
     <AuthContext.Provider
@@ -166,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         perfil,
         rol: rolActual,
         loading,
+        isAuthenticated,
         loginConGoogle,
         loginDemo,
         logout,

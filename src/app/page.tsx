@@ -18,10 +18,12 @@ import {
 import { TicketModal } from "@/components/tickets/TicketModal"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
+import { useAuth } from "@/context/AuthContext"
 import { getOrdenesServicio } from "@/services/ordenServicioService"
 import { OrdenServicio } from "@/types"
 
 export default function Dashboard() {
+  const { esAdmin } = useAuth()
   const [ordenes, setOrdenes] = useState<OrdenServicio[]>([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState("")
@@ -100,6 +102,14 @@ export default function Dashboard() {
               >
                 Clientes Corporativos
               </button>
+              {esAdmin && (
+                <button 
+                  onClick={() => router.push('/usuarios')}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  Gestión de Usuarios
+                </button>
+              )}
             </nav>
           </div>
 
