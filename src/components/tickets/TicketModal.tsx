@@ -146,13 +146,24 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
       return
     }
 
-    if (!ruc.trim() || ruc.length < 8) {
-      toast.error("Ingrese un número de RUC válido.")
+    const rucRegex = /^[0-9]{11}$/
+    if (!rucRegex.test(ruc.trim())) {
+      toast.error("El RUC empresarial debe tener exactamente 11 dígitos numéricos.")
       return
     }
 
     if (!razonSocial.trim()) {
       toast.error("La razón social del cliente es obligatoria.")
+      return
+    }
+
+    if (correo.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
+      toast.error("El formato del correo corporativo no es válido.")
+      return
+    }
+
+    if (!marca.trim()) {
+      toast.error("La marca del dispositivo es obligatoria.")
       return
     }
 
@@ -447,15 +458,21 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
 
           {/* SECCIÓN 4: FALLA REPORTADA Y AUDITORÍA */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <FileEdit className="w-4 h-4 text-[#2369A1]" />
-              4. Falla Reportada por el Usuario
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="fallaReportada" className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <FileEdit className="w-4 h-4 text-[#2369A1]" />
+                4. Falla Reportada por el Usuario *
+              </Label>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {fallaReportada.length}/500 caracteres
+              </span>
+            </div>
 
             <div>
               <textarea
                 id="fallaReportada"
                 rows={3}
+                maxLength={500}
                 placeholder="Describa la avería reportada por el cliente..."
                 value={fallaReportada}
                 onChange={(e) => setFallaReportada(e.target.value)}
