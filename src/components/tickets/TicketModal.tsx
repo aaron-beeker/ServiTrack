@@ -25,8 +25,7 @@ import {
 import { verificarSerieActiva, crearOrdenServicio } from "@/services/ordenServicioService"
 import { getAllClientes, createCliente } from "@/services/clienteService"
 import { getAllModelos, createModelo } from "@/services/modeloService"
-import { getUsuariosSistema, createUsuarioSistema } from "@/services/usuarioService"
-import { Cliente, ModeloEquipo, OrdenServicio, UsuarioSistema, RolUsuario } from "@/types"
+import { Cliente, ModeloEquipo, OrdenServicio } from "@/types"
 import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
 
@@ -37,15 +36,20 @@ interface TicketModalProps {
 
 export function TicketModal({ children, onSuccess }: TicketModalProps) {
   const router = useRouter()
-  const { perfil } = useAuth()
+  const { perfil, user } = useAuth()
   const [open, setOpen] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [verificandoSerie, setVerificandoSerie] = useState(false)
 
+  // Datos del operador obtenidos automáticamente de la sesión autenticada
+  const nombreOperador = perfil?.nombreCompleto || user?.displayName || "Operador de Recepción"
+  const correoOperador = perfil?.correo || user?.email || "recepcion@mur-tecno.com.pe"
+  const cargoOperador = perfil?.cargo || (perfil?.rol === "ADMIN" ? "Administrador General" : perfil?.rol === "TECNICO" ? "Técnico de Taller" : "Asesor Comercial")
+  const operadorRegistro = perfil?.nombreCompleto ? `${perfil.nombreCompleto} (${correoOperador})` : correoOperador
+
   // Catálogos Maestros para Autollenado
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [modelos, setModelos] = useState<ModeloEquipo[]>([])
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([])
 
   // Selectores de Plantilla / Autocompletado
   const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState<string>("")
@@ -68,13 +72,6 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
   const [nuevoModeloTipo, setNuevoModeloTipo] = useState("Laptop")
   const [nuevoModeloPartNumber, setNuevoModeloPartNumber] = useState("")
 
-  const [mostrandoNuevoOperador, setMostrandoNuevoOperador] = useState(false)
-  const [guardandoNuevoOperador, setGuardandoNuevoOperador] = useState(false)
-  const [nuevoOperadorNombre, setNuevoOperadorNombre] = useState("")
-  const [nuevoOperadorCorreo, setNuevoOperadorCorreo] = useState("")
-  const [nuevoOperadorCargo, setNuevoOperadorCargo] = useState("Técnico de Taller")
-  const [nuevoOperadorRol, setNuevoOperadorRol] = useState<RolUsuario>("TECNICO")
-
   // Estado del formulario principal - Serie y Validación
   const [serie, setSerie] = useState("")
   const [serieChecked, setSerieChecked] = useState(false)
@@ -93,9 +90,8 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
   const [modelo, setModelo] = useState("")
   const [partNumber, setPartNumber] = useState("")
 
-  // Estado - Falla y Auditoría
+  // Estado - Falla
   const [fallaReportada, setFallaReportada] = useState("")
-  const [registradoPor, setRegistradoPor] = useState("")
 
   // Cargar catálogos al abrir el modal
   useEffect(() => {
@@ -104,17 +100,8 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
       getAllClientes().then(data => setClientes(data)).catch(err => console.error(err))
       // 2. Modelos
       getAllModelos().then(data => setModelos(data)).catch(err => console.error(err))
-      // 3. Usuarios/Operadores
-      getUsuariosSistema().then(users => {
-        setUsuarios(users)
-        if (perfil?.correo) {
-          setRegistradoPor(perfil.correo)
-        } else if (users.length > 0 && !registradoPor) {
-          setRegistradoPor(users[0].correo)
-        }
-      }).catch(err => console.error(err))
     }
-  }, [open, registradoPor, perfil])
+  }, [open])
 
   const resetForm = () => {
     setSerie("")
@@ -134,7 +121,6 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
     setModeloSeleccionadoId("")
     setMostrandoNuevoCliente(false)
     setMostrandoNuevoModelo(false)
-    setMostrandoNuevoOperador(false)
     setGuardando(false)
   }
 
@@ -256,37 +242,7 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
     }
   }
 
-  // Crear y Autoseleccionar Nuevo Operador
-  const handleGuardarNuevoOperador = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!nuevoOperadorNombre.trim() || !nuevoOperadorCorreo.trim()) {
-      toast.error("Nombre y Correo corporativo son obligatorios.")
-      return
-    }
 
-    setGuardandoNuevoOperador(true)
-    try {
-      const op = await createUsuarioSistema({
-        nombreCompleto: nuevoOperadorNombre.trim(),
-        correo: nuevoOperadorCorreo.trim(),
-        cargo: nuevoOperadorCargo.trim() || "Técnico de Taller",
-        rol: nuevoOperadorRol,
-        activo: true
-      })
-
-      const lista = await getUsuariosSistema()
-      setUsuarios(lista)
-      setRegistradoPor(op.correo)
-
-      setMostrandoNuevoOperador(false)
-      toast.success(`Operador "${op.nombreCompleto}" registrado y asignado.`)
-    } catch (err) {
-      console.error(err)
-      toast.error("Error al registrar operador.")
-    } finally {
-      setGuardandoNuevoOperador(false)
-    }
-  }
 
   // Verificación estricta de la regla de negocio (Etapa 1)
   const handleVerificarSerie = async (serieAProbar?: string) => {
@@ -388,7 +344,7 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
           partNumber: partNumber.trim() || undefined
         },
         fallaReportada: fallaReportada.trim(),
-        registradoPor: registradoPor || "operador@mur-tecno.com.pe"
+        registradoPor: operadorRegistro
       }
 
       const codigoGenerado = await crearOrdenServicio(nuevoIngreso)
@@ -918,108 +874,43 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
               />
             </div>
 
-            {/* Operador de Recepción */}
+            {/* Operador de Recepción (Automático desde la Sesión Activa) */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label htmlFor="registradoPor" className="text-xs text-slate-600 flex items-center gap-1">
+              <Label className="text-xs text-slate-600 flex items-center justify-between mb-1.5 font-medium">
+                <span className="flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-[#2369A1]" />
-                  Operador / Recepción Técnica *
-                </Label>
-                <button
-                  type="button"
-                  onClick={() => setMostrandoNuevoOperador(!mostrandoNuevoOperador)}
-                  className="inline-flex items-center gap-1 text-[11px] text-[#2369A1] hover:underline font-semibold"
-                >
-                  <Plus className="w-3 h-3" />
-                  {mostrandoNuevoOperador ? "Cerrar" : "Nuevo Operador"}
-                </button>
-              </div>
+                  Operador / Recepción Técnica
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Sesión activa
+                </span>
+              </Label>
 
-              {/* Panel Desplegable Inline: Crear Nuevo Operador */}
-              {mostrandoNuevoOperador && (
-                <div className="mb-3 p-3 bg-blue-50/70 border border-[#2369A1]/30 rounded-xl space-y-2.5 animate-in fade-in-50">
-                  <h4 className="text-xs font-bold text-[#2369A1]">Registrar Nuevo Operador / Técnico</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <Label className="text-[11px] text-slate-700">Nombre Completo *</Label>
-                      <Input
-                        placeholder="Ej. Luis Ramírez"
-                        value={nuevoOperadorNombre}
-                        onChange={(e) => setNuevoOperadorNombre(e.target.value)}
-                        className="mt-0.5 bg-white border-slate-300 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-700">Correo Corporativo *</Label>
-                      <Input
-                        type="email"
-                        placeholder="luis.ramirez@murtecnologia.com"
-                        value={nuevoOperadorCorreo}
-                        onChange={(e) => setNuevoOperadorCorreo(e.target.value)}
-                        className="mt-0.5 bg-white border-slate-300 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-700">Cargo</Label>
-                      <Input
-                        placeholder="Ej. Técnico de Taller"
-                        value={nuevoOperadorCargo}
-                        onChange={(e) => setNuevoOperadorCargo(e.target.value)}
-                        className="mt-0.5 bg-white border-slate-300 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-700">Rol</Label>
-                      <select
-                        value={nuevoOperadorRol}
-                        onChange={(e) => setNuevoOperadorRol(e.target.value as RolUsuario)}
-                        className="mt-0.5 w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs text-slate-900"
-                      >
-                        <option value="TECNICO">Técnico de Laboratorio</option>
-                        <option value="VENTAS">Ventas / Comercial</option>
-                        <option value="ADMIN">Administrador</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setMostrandoNuevoOperador(false)}
-                      className="text-xs border-slate-300"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleGuardarNuevoOperador}
-                      disabled={guardandoNuevoOperador}
-                      className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
-                    >
-                      {guardandoNuevoOperador ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                      Guardar Operador
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200/90 rounded-xl">
+                <div className="w-8 h-8 rounded-full bg-[#2369A1]/10 text-[#2369A1] flex items-center justify-center font-bold text-xs shrink-0 border border-[#2369A1]/20">
+                  {nombreOperador
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((n: string) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase() || "OP"}
                 </div>
-              )}
-
-              <select
-                id="registradoPor"
-                value={registradoPor}
-                onChange={(e) => setRegistradoPor(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-[#2369A1]"
-              >
-                {usuarios.map(u => (
-                  <option key={u.id} value={u.correo}>
-                    {u.nombreCompleto} ({u.cargo || u.rol})
-                  </option>
-                ))}
-                {usuarios.length === 0 && (
-                  <option value="kevin.soporte@murtecnologia.com">Kevin Quispe (Técnico de Taller)</option>
-                )}
-              </select>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-semibold text-slate-900 truncate">
+                      {nombreOperador}
+                    </p>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#2369A1]/10 text-[#2369A1] border border-[#2369A1]/20">
+                      {perfil?.rol || "OPERADOR"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {correoOperador} {cargoOperador ? `• ${cargoOperador}` : ""}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
