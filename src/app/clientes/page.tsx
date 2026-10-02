@@ -22,6 +22,7 @@ import {
   Loader2
 } from "lucide-react"
 import { MurLogo } from "@/components/brand/MurLogo"
+import { UserMenu } from "@/components/auth/UserMenu"
 import { getAllClientes, createCliente, updateCliente, deleteCliente } from "@/services/clienteService"
 import { Cliente } from "@/types"
 import { toast } from "sonner"
@@ -222,6 +223,10 @@ export default function ClientesPage() {
               <Plus className="mr-1.5 h-4 w-4" />
               Nuevo Cliente
             </Button>
+
+            <div className="border-l border-slate-200 pl-3">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>

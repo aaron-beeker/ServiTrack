@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { TicketModal } from "@/components/tickets/TicketModal"
 import { MurLogo } from "@/components/brand/MurLogo"
+import { UserMenu } from "@/components/auth/UserMenu"
 import { getOrdenesServicio } from "@/services/ordenServicioService"
 import { OrdenServicio } from "@/types"
 
@@ -118,6 +119,10 @@ export default function Dashboard() {
                 Nueva Orden
               </Button>
             </TicketModal>
+
+            <div className="border-l border-slate-200 pl-3">
+              <UserMenu />
+            </div>
           </div>
 
         </div>

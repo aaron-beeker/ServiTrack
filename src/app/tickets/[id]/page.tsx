@@ -51,8 +51,11 @@ import {
   Lock
 } from "lucide-react"
 import { toast } from "sonner"
+import { UserMenu } from "@/components/auth/UserMenu"
+import { useAuth } from "@/context/AuthContext"
 
 export default function DetalleOrdenPage() {
+  const { rol, esAdmin, esTecnico, esVentas, perfil } = useAuth()
   const params = useParams()
   const router = useRouter()
   const codigo = params.id as string
@@ -607,6 +610,10 @@ export default function DetalleOrdenPage() {
                 Registrar Entrega
               </Button>
             )}
+
+            <div className="border-l border-slate-200 pl-3">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>

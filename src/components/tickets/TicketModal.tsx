@@ -26,7 +26,8 @@ import { verificarSerieActiva, crearOrdenServicio } from "@/services/ordenServic
 import { getAllClientes, createCliente } from "@/services/clienteService"
 import { getAllModelos, createModelo } from "@/services/modeloService"
 import { getUsuariosSistema, createUsuarioSistema } from "@/services/usuarioService"
-import { Cliente, ModeloEquipo, OrdenServicio, UsuarioSistema } from "@/types"
+import { Cliente, ModeloEquipo, OrdenServicio, UsuarioSistema, RolUsuario } from "@/types"
+import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
 
 interface TicketModalProps {
@@ -36,6 +37,7 @@ interface TicketModalProps {
 
 export function TicketModal({ children, onSuccess }: TicketModalProps) {
   const router = useRouter()
+  const { perfil } = useAuth()
   const [open, setOpen] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [verificandoSerie, setVerificandoSerie] = useState(false)
@@ -71,7 +73,7 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
   const [nuevoOperadorNombre, setNuevoOperadorNombre] = useState("")
   const [nuevoOperadorCorreo, setNuevoOperadorCorreo] = useState("")
   const [nuevoOperadorCargo, setNuevoOperadorCargo] = useState("Técnico de Taller")
-  const [nuevoOperadorRol, setNuevoOperadorRol] = useState<'ADMIN' | 'TECNICO'>("TECNICO")
+  const [nuevoOperadorRol, setNuevoOperadorRol] = useState<RolUsuario>("TECNICO")
 
   // Estado del formulario principal - Serie y Validación
   const [serie, setSerie] = useState("")
@@ -105,12 +107,14 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
       // 3. Usuarios/Operadores
       getUsuariosSistema().then(users => {
         setUsuarios(users)
-        if (users.length > 0 && !registradoPor) {
+        if (perfil?.correo) {
+          setRegistradoPor(perfil.correo)
+        } else if (users.length > 0 && !registradoPor) {
           setRegistradoPor(users[0].correo)
         }
       }).catch(err => console.error(err))
     }
-  }, [open, registradoPor])
+  }, [open, registradoPor, perfil])
 
   const resetForm = () => {
     setSerie("")
@@ -968,10 +972,11 @@ export function TicketModal({ children, onSuccess }: TicketModalProps) {
                       <Label className="text-[11px] text-slate-700">Rol</Label>
                       <select
                         value={nuevoOperadorRol}
-                        onChange={(e) => setNuevoOperadorRol(e.target.value as any)}
+                        onChange={(e) => setNuevoOperadorRol(e.target.value as RolUsuario)}
                         className="mt-0.5 w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs text-slate-900"
                       >
-                        <option value="TECNICO">Técnico</option>
+                        <option value="TECNICO">Técnico de Laboratorio</option>
+                        <option value="VENTAS">Ventas / Comercial</option>
                         <option value="ADMIN">Administrador</option>
                       </select>
                     </div>

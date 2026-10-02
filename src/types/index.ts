@@ -109,14 +109,18 @@ export interface RepuestoCatalogo {
   activo: boolean;
 }
 
+export type RolUsuario = 'ADMIN' | 'TECNICO' | 'VENTAS';
+
 // Catálogo maestro: usuarios
 export interface UsuarioSistema {
-  id: string; // e.g. "beeker.valdez"
+  id: string; // e.g. "beeker.valdez" o uid de Google
   nombreCompleto: string;
   correo: string;
-  rol: 'ADMIN' | 'TECNICO';
+  rol: RolUsuario;
   cargo: string;
   activo: boolean;
+  fotoUrl?: string;
+  creadoEl?: string;
 }
 
 // Aliases para retrocompatibilidad

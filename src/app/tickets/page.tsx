@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Search, Laptop, RefreshCw, ChevronRight } from "lucide-react"
 import { TicketModal } from "@/components/tickets/TicketModal"
 import { MurLogo } from "@/components/brand/MurLogo"
+import { UserMenu } from "@/components/auth/UserMenu"
 
 export default function TicketsList() {
   const [ordenes, setOrdenes] = useState<OrdenServicio[]>([])
@@ -92,6 +93,9 @@ export default function TicketsList() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#2369A1]' : ''}`} />
             </button>
             <TicketModal onSuccess={() => cargar()} />
+            <div className="border-l border-slate-200 pl-3">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>
