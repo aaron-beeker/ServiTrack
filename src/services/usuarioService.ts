@@ -194,6 +194,19 @@ export const actualizarRolUsuario = async (id: string, nuevoRol: RolUsuario): Pr
   }
 };
 
+export const actualizarUsuarioSistema = async (
+  id: string,
+  datos: Partial<Omit<UsuarioSistema, 'id'>>
+): Promise<void> => {
+  try {
+    const docRef = doc(db, 'usuarios', id);
+    await updateDoc(docRef, datos);
+  } catch (err) {
+    console.error('Error al actualizar usuario:', err);
+    throw err;
+  }
+};
+
 export const deleteUsuarioSistema = async (id: string): Promise<void> => {
   try {
     const docRef = doc(db, 'usuarios', id);
@@ -203,3 +216,4 @@ export const deleteUsuarioSistema = async (id: string): Promise<void> => {
     throw err;
   }
 };
+

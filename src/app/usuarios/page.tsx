@@ -7,7 +7,8 @@ import { UsuarioSistema, RolUsuario } from "@/types"
 import { 
   getUsuariosSistema, 
   createUsuarioSistema, 
-  actualizarRolUsuario, 
+  actualizarRolUsuario,
+  actualizarUsuarioSistema,
   deleteUsuarioSistema 
 } from "@/services/usuarioService"
 import { MurLogo } from "@/components/brand/MurLogo"
@@ -24,6 +25,7 @@ import {
   Search, 
   RefreshCw, 
   Trash2, 
+  Pencil,
   ArrowLeft, 
   Lock, 
   CheckCircle2, 
@@ -48,6 +50,59 @@ export default function UsuariosPage() {
   const [nuevoCorreo, setNuevoCorreo] = useState("")
   const [nuevoCargo, setNuevoCargo] = useState("Técnico de Taller")
   const [nuevoRol, setNuevoRol] = useState<RolUsuario>("TECNICO")
+
+  // Modal Modificar / Editar Usuario
+  const [modalEditarOpen, setModalEditarOpen] = useState(false)
+  const [usuarioAEditar, setUsuarioAEditar] = useState<UsuarioSistema | null>(null)
+  const [editNombre, setEditNombre] = useState("")
+  const [editCargo, setEditCargo] = useState("")
+  const [editRol, setEditRol] = useState<RolUsuario>("TECNICO")
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+
+  const handleAbrirEditar = (u: UsuarioSistema) => {
+    setUsuarioAEditar(u)
+    setEditNombre(u.nombreCompleto)
+    setEditCargo(u.cargo || "")
+    setEditRol(u.rol)
+    setModalEditarOpen(true)
+  }
+
+  const handleSubmitEditarUsuario = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!usuarioAEditar) return
+    if (!editNombre.trim()) {
+      toast.error("El nombre completo es obligatorio.")
+      return
+    }
+
+    const esSuperAdmin = usuarioAEditar.correo.toLowerCase() === 'beeker147@gmail.com'
+    const rolAGuardar = esSuperAdmin ? 'ADMIN' : editRol
+
+    setGuardandoEdicion(true)
+    try {
+      await actualizarUsuarioSistema(usuarioAEditar.id, {
+        nombreCompleto: editNombre.trim(),
+        cargo: editCargo.trim() || "Colaborador MUR",
+        rol: rolAGuardar
+      })
+
+      setUsuarios(prev => prev.map(u => u.id === usuarioAEditar.id ? {
+        ...u,
+        nombreCompleto: editNombre.trim(),
+        cargo: editCargo.trim() || "Colaborador MUR",
+        rol: rolAGuardar
+      } : u))
+
+      toast.success(`Usuario "${editNombre}" actualizado con éxito.`)
+      setModalEditarOpen(false)
+      setUsuarioAEditar(null)
+    } catch (err) {
+      console.error(err)
+      toast.error("Error al actualizar la información del usuario.")
+    } finally {
+      setGuardandoEdicion(false)
+    }
+  }
 
   const cargarUsuarios = async () => {
     setLoading(true)
@@ -413,15 +468,24 @@ export default function UsuariosPage() {
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
-                          {!esSuperAdmin && (
+                          <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => handleEliminarUsuario(u)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                              title="Eliminar usuario"
+                              onClick={() => handleAbrirEditar(u)}
+                              className="p-1.5 text-slate-400 hover:text-[#2369A1] hover:bg-blue-50 rounded-md transition-colors"
+                              title="Modificar / Editar datos del usuario"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
-                          )}
+                            {!esSuperAdmin && (
+                              <button
+                                onClick={() => handleEliminarUsuario(u)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                title="Eliminar usuario"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -518,6 +582,90 @@ export default function UsuariosPage() {
               >
                 {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                 Guardar Usuario
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Modificar / Editar Usuario Existente */}
+      <Dialog open={modalEditarOpen} onOpenChange={setModalEditarOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="p-6 pb-4 border-b border-slate-200 bg-white">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-[#2369A1]" />
+                Modificar Información de Usuario
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-1">
+                Actualice los datos o el rol asignado para {usuarioAEditar?.correo}.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <form onSubmit={handleSubmitEditarUsuario} className="p-6 space-y-4 text-xs">
+            <div>
+              <Label className="text-xs text-slate-700">Nombre Completo *</Label>
+              <Input
+                placeholder="Nombre completo del usuario"
+                value={editNombre}
+                onChange={(e) => setEditNombre(e.target.value)}
+                className="mt-1 bg-white border-slate-300 text-xs"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs text-slate-700">Correo Electrónico (No editable)</Label>
+              <Input
+                value={usuarioAEditar?.correo || ""}
+                disabled
+                className="mt-1 bg-slate-50 border-slate-200 text-xs font-mono text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-slate-700">Cargo / Función</Label>
+                <Input
+                  placeholder="Ej. Técnico Senior de Laboratorio"
+                  value={editCargo}
+                  onChange={(e) => setEditCargo(e.target.value)}
+                  className="mt-1 bg-white border-slate-300 text-xs"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs text-slate-700">Rol en el Sistema *</Label>
+                <select
+                  value={editRol}
+                  disabled={usuarioAEditar?.correo.toLowerCase() === 'beeker147@gmail.com'}
+                  onChange={(e) => setEditRol(e.target.value as RolUsuario)}
+                  className="mt-1 w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#2369A1]"
+                >
+                  <option value="TECNICO">Técnico (Laboratorio)</option>
+                  <option value="VENTAS">Ventas (Comercial)</option>
+                  <option value="ADMIN">Administrador (Operaciones)</option>
+                </select>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4 border-t border-slate-200">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setModalEditarOpen(false)}
+                className="text-xs border-slate-300 text-slate-600"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={guardandoEdicion}
+                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold"
+              >
+                {guardandoEdicion ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Guardar Modificaciones
               </Button>
             </DialogFooter>
           </form>
