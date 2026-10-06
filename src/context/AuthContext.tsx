@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
-        setUser(firebaseUser)
         try {
           const perfilSync = await syncUsuarioGoogle({
             uid: firebaseUser.uid,
@@ -52,10 +51,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL
           })
+          setUser(firebaseUser)
           setPerfil(perfilSync)
           localStorage.removeItem(STORAGE_KEY_DEMO)
-        } catch (err) {
-          console.error("Error sincronizando perfil de Google:", err)
+        } catch (err: any) {
+          console.warn("Usuario no autorizado en el sistema:", err.message)
+          await firebaseSignOut(auth).catch(() => {})
+          setUser(null)
+          setPerfil(null)
+          localStorage.removeItem(STORAGE_KEY_DEMO)
+          toast.error(err.message || "Acceso denegado: Su correo no está registrado en el sistema.")
         }
       } else {
         setUser(null)
@@ -88,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loading, perfil, pathname, router])
 
   // Inicio de sesión con Google (Gmail)
-  const loginConGoogle = async (rolInicial: RolUsuario = 'VENTAS') => {
+  const loginConGoogle = async (_rolInicial?: RolUsuario) => {
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
@@ -99,26 +104,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPopup(auth, provider)
       const firebaseUser = result.user
 
-      if (firebaseUser.email) {
-        const perfilSync = await syncUsuarioGoogle({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL
-        }, rolInicial)
-
-        setUser(firebaseUser)
-        setPerfil(perfilSync)
-        localStorage.removeItem(STORAGE_KEY_DEMO)
-        toast.success(`Bienvenido, ${perfilSync.nombreCompleto} (${perfilSync.rol})`)
-        router.push("/")
+      if (!firebaseUser || !firebaseUser.email) {
+        throw new Error("No se pudo obtener el correo de la cuenta de Google.")
       }
+
+      // Validar contra Firestore si el correo fue previamente registrado por el Admin
+      const perfilSync = await syncUsuarioGoogle({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL
+      })
+
+      setUser(firebaseUser)
+      setPerfil(perfilSync)
+      localStorage.removeItem(STORAGE_KEY_DEMO)
+      toast.success(`Bienvenido, ${perfilSync.nombreCompleto} (${perfilSync.rol})`)
+      router.push("/")
     } catch (err: any) {
       console.error("Error al iniciar sesión con Google:", err)
+      // Cerrar sesión en Firebase si el usuario no tiene autorización en ServiTrack
+      await firebaseSignOut(auth).catch(() => {})
+      setUser(null)
+      setPerfil(null)
+      localStorage.removeItem(STORAGE_KEY_DEMO)
+
       if (err.code === 'auth/popup-closed-by-user') {
         toast.info("Inicio de sesión cancelado.")
       } else {
-        toast.error(err.message || "Error al autenticar con Google. Verifique su conexión.")
+        toast.error(err.message || "Error al autenticar con Google. Verifique su cuenta.")
       }
       throw err
     } finally {

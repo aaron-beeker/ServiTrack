@@ -21,20 +21,25 @@ export default function LoginPage() {
   const router = useRouter()
   const { perfil, loginConGoogle, loginDemo, logout, loading } = useAuth()
   const [iniciandoGoogle, setIniciandoGoogle] = useState(false)
+  const [errorAuth, setErrorAuth] = useState<string | null>(null)
 
   const handleGoogleLogin = async () => {
+    setErrorAuth(null)
     setIniciandoGoogle(true)
     try {
-      await loginConGoogle('VENTAS')
+      await loginConGoogle()
       router.push("/")
-    } catch (err) {
-      // Notificado en AuthContext
+    } catch (err: any) {
+      if (err.message && err.code !== 'auth/popup-closed-by-user') {
+        setErrorAuth(err.message)
+      }
     } finally {
       setIniciandoGoogle(false)
     }
   }
 
   const handleDemoLogin = (rolDeseado: RolUsuario) => {
+    setErrorAuth(null)
     loginDemo(rolDeseado)
     router.push("/")
   }
@@ -66,6 +71,17 @@ export default function LoginPage() {
             Ingrese con su cuenta institucional o Gmail para acceder al laboratorio y control de taller.
           </p>
         </div>
+
+        {/* Alerta de Error de Autorización */}
+        {errorAuth && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2.5 animate-in fade-in-50">
+            <Lock className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold text-rose-900">Acceso no autorizado</p>
+              <p className="text-[11px] leading-relaxed text-rose-700">{errorAuth}</p>
+            </div>
+          </div>
+        )}
 
         {/* Si ya existe una sesión abierta */}
         {perfil ? (

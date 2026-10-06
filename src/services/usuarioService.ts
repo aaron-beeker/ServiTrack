@@ -119,8 +119,19 @@ export const createUsuarioSistema = async (usuario: Omit<UsuarioSistema, 'id'>):
 };
 
 /**
- * Sincroniza un usuario autenticado vía Google con el catálogo de Firestore.
- * Si es beeker147@gmail.com, se le asigna de forma forzada e inequívoca el rol ADMIN.
+ * Sincroniza y valida un usuario autenticado vía Google contra el catálogo de Firestore.
+ * 
+ * POLÍTICA ESTRICTA DE ACCESO:
+ * 1. Solo 'beeker147@gmail.com' es el Administrador Principal del sistema.
+ * 2. Cualquier otro correo DEBE estar registrado previamente por el Administrador en la gestión de usuarios.
+ * 3. Si el correo NO está registrado:
+ *    - SE RECHAZA EL ACCESO.
+ *    - NO se crea ningún usuario en Firestore.
+ *    - NO se le asigna rol ni se le permite ingresar.
+ * 4. Si el usuario está registrado pero inactivo (activo === false):
+ *    - SE RECHAZA EL ACCESO.
+ * 5. Si está registrado y activo:
+ *    - Mantiene el rol asignado por el Administrador en Firestore (sin modificaciones arbitrarias).
  */
 export const syncUsuarioGoogle = async (
   googleUser: {
@@ -128,60 +139,61 @@ export const syncUsuarioGoogle = async (
     email: string;
     displayName?: string | null;
     photoURL?: string | null;
-  },
-  rolSugerido: RolUsuario = 'VENTAS'
+  }
 ): Promise<UsuarioSistema> => {
   const correo = googleUser.email.trim().toLowerCase();
   const esBeekerAdmin = correo === 'beeker147@gmail.com';
   
-  // 1. Verificar si ya existe por correo
-  const existente = await getUsuarioPorCorreo(correo);
-  if (existente) {
-    let rolFinal = esBeekerAdmin ? 'ADMIN' : existente.rol;
-    let cargoFinal = esBeekerAdmin ? 'Administrador de Operaciones y TI' : existente.cargo;
+  // 1. Buscar si el correo fue previamente registrado por el Administrador
+  let usuarioRegistrado = await getUsuarioPorCorreo(correo);
 
-    try {
-      const docRef = doc(db, 'usuarios', existente.id);
-      await updateDoc(docRef, { 
-        fotoUrl: googleUser.photoURL || existente.fotoUrl || '',
-        rol: rolFinal,
-        cargo: cargoFinal
-      });
-    } catch (e) {
-      // Silencioso
-    }
+  // 2. Si es el correo oficial del super-admin (beeker147@gmail.com) y aún no existía en Firestore
+  if (!usuarioRegistrado && esBeekerAdmin) {
+    usuarioRegistrado = await createUsuarioSistema({
+      nombreCompleto: googleUser.displayName || 'Beeker Aarón Valdéz Mattos',
+      correo: 'beeker147@gmail.com',
+      rol: 'ADMIN',
+      cargo: 'Administrador de Operaciones y TI',
+      activo: true,
+      fotoUrl: googleUser.photoURL || ''
+    });
+  }
 
-    return {
-      ...existente,
+  // 3. Si NO está registrado por el administrador: BLOQUEO ESTRICTO
+  if (!usuarioRegistrado) {
+    throw new Error(
+      `Acceso denegado: El correo "${correo}" no está registrado en el sistema. Solicite al Administrador (beeker147@gmail.com) que registre su cuenta y le asigne un rol operativo.`
+    );
+  }
+
+  // 4. Si el usuario existe pero ha sido desactivado: BLOQUEO
+  if (usuarioRegistrado.activo === false) {
+    throw new Error(
+      `Acceso suspendido: La cuenta vinculada a "${correo}" ha sido desactivada por el Administrador.`
+    );
+  }
+
+  // 5. Usuario autorizado: mantener el rol oficial asignado por el admin y actualizar foto/nombre
+  const rolFinal: RolUsuario = esBeekerAdmin ? 'ADMIN' : usuarioRegistrado.rol;
+  const cargoFinal = usuarioRegistrado.cargo || (rolFinal === 'ADMIN' ? 'Administrador' : rolFinal === 'TECNICO' ? 'Técnico de Taller' : 'Asesor Comercial');
+
+  try {
+    const docRef = doc(db, 'usuarios', usuarioRegistrado.id);
+    await updateDoc(docRef, { 
+      fotoUrl: googleUser.photoURL || usuarioRegistrado.fotoUrl || '',
       rol: rolFinal,
-      cargo: cargoFinal,
-      fotoUrl: googleUser.photoURL || existente.fotoUrl
-    };
+      cargo: cargoFinal
+    });
+  } catch (e) {
+    // Si falla actualización secundaria de foto en Firestore, no interrumpir el inicio
   }
 
-  // 2. Si no existe, determinar rol
-  let rol: RolUsuario = rolSugerido;
-  let cargo = 'Asesor Comercial / Ventas';
-
-  if (esBeekerAdmin || correo.includes('admin') || correo.includes('valdez') || correo.includes('aaron')) {
-    rol = 'ADMIN';
-    cargo = 'Administrador de Operaciones y TI';
-  } else if (correo.includes('soporte') || correo.includes('tecnico') || rolSugerido === 'TECNICO') {
-    rol = 'TECNICO';
-    cargo = 'Técnico de Laboratorio';
-  } else if (rolSugerido === 'VENTAS') {
-    rol = 'VENTAS';
-    cargo = 'Asesor Comercial y Mesa de Ayuda';
-  }
-
-  return await createUsuarioSistema({
-    nombreCompleto: googleUser.displayName || (esBeekerAdmin ? 'Beeker Aarón Valdéz Mattos' : correo.split('@')[0]),
-    correo,
-    rol,
-    cargo,
-    activo: true,
-    fotoUrl: googleUser.photoURL || ''
-  });
+  return {
+    ...usuarioRegistrado,
+    rol: rolFinal,
+    cargo: cargoFinal,
+    fotoUrl: googleUser.photoURL || usuarioRegistrado.fotoUrl
+  };
 };
 
 export const actualizarRolUsuario = async (id: string, nuevoRol: RolUsuario): Promise<void> => {
