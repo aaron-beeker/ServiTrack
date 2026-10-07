@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { 
   OrdenServicio, 
@@ -41,9 +41,46 @@ export const verificarSerieActiva = async (numeroSerie: string): Promise<OrdenSe
 
 /**
  * Genera el siguiente código correlativo atómico en formato DT-XXXXXX
+ * empleando una transacción atómica (runTransaction) en Firestore para evitar colisiones concurrentes.
  */
 export const generarSiguienteCodigoDT = async (): Promise<string> => {
+  const contadorRef = doc(db, 'contadores', 'ordenes_servicio');
+
   try {
+    const nuevoCodigo = await runTransaction(db, async (transaction) => {
+      const contadorDoc = await transaction.get(contadorRef);
+      let siguienteNumero = 1;
+
+      if (contadorDoc.exists()) {
+        siguienteNumero = (contadorDoc.data()?.ultimoNumero || 0) + 1;
+      } else {
+        // Inicializar a partir del número correlativo más alto existente en la base de datos
+        const snapshot = await getDocs(collection(db, COLECCION_ORDENES));
+        let maxNum = 0;
+        snapshot.docs.forEach((docSnap) => {
+          const match = docSnap.id.match(/DT-(\d+)/i) || (docSnap.data().codigoDT || '').match(/DT-(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        });
+        siguienteNumero = Math.max(maxNum + 1, 1);
+      }
+
+      transaction.set(contadorRef, { 
+        ultimoNumero: siguienteNumero, 
+        actualizadoEl: new Date().toISOString() 
+      }, { merge: true });
+
+      return `DT-${siguienteNumero.toString().padStart(6, '0')}`;
+    });
+
+    return nuevoCodigo;
+  } catch (err) {
+    console.error('Error al generar código correlativo en transacción:', err);
+    // Mecanismo de contingencia en caso de desconexión o fallo de concurrencia
     const ref = collection(db, COLECCION_ORDENES);
     const snapshot = await getDocs(ref);
 
@@ -61,9 +98,6 @@ export const generarSiguienteCodigoDT = async (): Promise<string> => {
 
     const siguienteNum = maxNum + 1;
     return `DT-${siguienteNum.toString().padStart(6, '0')}`;
-  } catch (err) {
-    console.error('Error al generar código correlativo:', err);
-    return `DT-${Math.floor(100000 + Math.random() * 900000)}`;
   }
 };
 
