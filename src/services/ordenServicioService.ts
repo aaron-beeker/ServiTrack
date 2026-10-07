@@ -1,14 +1,14 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  OrdenServicio, 
-  ClienteOrden, 
-  EquipoOrden, 
-  DiagnosticoOrden, 
-  IntervencionOrden, 
+import {
+  OrdenServicio,
+  ClienteOrden,
+  EquipoOrden,
+  DiagnosticoOrden,
+  IntervencionOrden,
   CierreOrden,
   EstadoGeneral,
-  AprobacionCliente 
+  AprobacionCliente
 } from '@/types';
 
 const COLECCION_ORDENES = 'ordenes_servicio';
@@ -30,7 +30,7 @@ export const verificarSerieActiva = async (numeroSerie: string): Promise<OrdenSe
   for (const d of snapshot.docs) {
     const orden = d.data() as OrdenServicio;
     const ordenSerie = orden.ingreso?.equipo?.numeroSerie?.trim().toUpperCase();
-    
+
     if (ordenSerie === serieNormalized && !ESTADOS_LIQUIDADOS.includes(orden.estadoGeneral)) {
       return { ...orden, id: d.id, codigoDT: orden.codigoDT || d.id };
     }
@@ -69,9 +69,9 @@ export const generarSiguienteCodigoDT = async (): Promise<string> => {
         siguienteNumero = Math.max(maxNum + 1, 1);
       }
 
-      transaction.set(contadorRef, { 
-        ultimoNumero: siguienteNumero, 
-        actualizadoEl: new Date().toISOString() 
+      transaction.set(contadorRef, {
+        ultimoNumero: siguienteNumero,
+        actualizadoEl: new Date().toISOString()
       }, { merge: true });
 
       return `DT-${siguienteNumero.toString().padStart(6, '0')}`;
@@ -111,13 +111,14 @@ export const crearOrdenServicio = async (params: {
   fallaReportada: string;
   registradoPor?: string;
 }): Promise<string> => {
+  // 1. Verificación antiduplicidad de serie
   const ordenActiva = await verificarSerieActiva(params.equipo.numeroSerie);
   if (ordenActiva) {
     throw new Error(
       `El equipo con N° de Serie ${params.equipo.numeroSerie} tiene la atención activa ${ordenActiva.codigoDT} en estado ${ordenActiva.estadoGeneral}. Bloquear creación hasta liquidar orden previa.`
     );
   }
-
+  // 2. Ejecución de la transacción para obtener el correlativo único garantizado
   const codigoDT = await generarSiguienteCodigoDT();
   const ahora = new Date().toISOString();
 
@@ -176,7 +177,7 @@ export const crearOrdenServicio = async (params: {
       urlPdf: null
     }
   };
-
+  // 3. Persistencia de la orden con el ID correlativo generado
   const docRef = doc(db, COLECCION_ORDENES, codigoDT);
   await setDoc(docRef, nuevaOrden);
 
@@ -232,11 +233,45 @@ export const getOrdenesServicio = async (): Promise<OrdenServicio[]> => {
 };
 
 /**
+ * Suscripción reactiva en tiempo real a la colección de órdenes de servicio en Firestore
+ */
+export const suscribirOrdenesServicio = (
+  callback: (ordenes: OrdenServicio[]) => void
+): (() => void) => {
+  try {
+    const ref = collection(db, COLECCION_ORDENES);
+    return onSnapshot(ref, (snapshot) => {
+      const ordenes = snapshot.docs.map((d) => {
+        const data = d.data() as OrdenServicio;
+        return {
+          ...data,
+          id: d.id,
+          codigoDT: data.codigoDT || d.id
+        };
+      });
+
+      ordenes.sort((a, b) => {
+        const fechaA = new Date(a.creadoEl || 0).getTime();
+        const fechaB = new Date(b.creadoEl || 0).getTime();
+        return fechaB - fechaA;
+      });
+
+      callback(ordenes);
+    }, (err) => {
+      console.error('Error en suscripción en tiempo real de órdenes:', err);
+    });
+  } catch (err) {
+    console.error('Error al iniciar onSnapshot:', err);
+    return () => {};
+  }
+};
+
+/**
  * Cambiar estado genérico de la orden
  */
 export const actualizarEstadoOrden = async (
-  codigoDT: string, 
-  nuevoEstado: EstadoGeneral, 
+  codigoDT: string,
+  nuevoEstado: EstadoGeneral,
   datosAdicionales?: Partial<OrdenServicio>
 ): Promise<void> => {
   const docRef = doc(db, COLECCION_ORDENES, codigoDT);
@@ -291,8 +326,8 @@ export const registrarDecisionCliente = async (
     registradoPor: registradoPor || 'operaciones@murtecnologia.com'
   };
 
-  const nuevoEstado: EstadoGeneral = aprobado 
-    ? 'APROBADO_PARA_REPARACION' 
+  const nuevoEstado: EstadoGeneral = aprobado
+    ? 'APROBADO_PARA_REPARACION'
     : 'CERRADO_SIN_REPARACION';
 
   await updateDoc(docRef, {
