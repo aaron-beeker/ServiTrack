@@ -19,7 +19,8 @@ import { TicketModal } from "@/components/tickets/TicketModal"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
 import { useAuth } from "@/context/AuthContext"
-import { getOrdenesServicio } from "@/services/ordenServicioService"
+import { getOrdenesServicio, suscribirOrdenesServicio } from "@/services/ordenServicioService"
+import { OrderStateBadge } from "@/components/tickets/OrdersTable"
 import { OrdenServicio } from "@/types"
 
 export default function Dashboard() {
@@ -44,6 +45,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     cargarOrdenes()
+    const desuscribir = suscribirOrdenesServicio((data) => {
+      setOrdenes(data)
+      setLoading(false)
+    })
+    return () => {
+      if (typeof desuscribir === "function") desuscribir()
+    }
   }, [])
 
   // Métricas
@@ -153,43 +161,77 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tarjetas de Métricas - Diseño Minimalista y Funcional */}
+        {/* Tarjetas de Métricas - Colores Estandarizados según Estado Operativo */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">1. Recepción</span>
-              <Clock className="w-4 h-4 text-amber-500" />
+          
+          {/* 1. Recepción - Azul Corporativo (#2369A1) */}
+          <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs hover:border-blue-300 transition-all group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                1. Recepción
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/80 flex items-center justify-center text-[#2369A1] group-hover:scale-105 transition-transform">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-bold text-slate-900">{registrados}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Pendiente de evaluación</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#2369A1]" />
+              <p className="text-[11px] text-slate-500 font-medium">Pendiente de evaluación</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">2. Diagnóstico</span>
-              <AlertCircle className="w-4 h-4 text-[#2369A1]" />
+          {/* 2. Diagnóstico - Amarillo / Ámbar */}
+          <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs hover:border-amber-300 transition-all group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                2. Diagnóstico
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-bold text-slate-900">{enDiagnostico}</div>
-            <p className="text-[11px] text-slate-500 mt-1">En revisión o propuesta</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <p className="text-[11px] text-slate-500 font-medium">En revisión o propuesta</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">3. En Taller / QA</span>
-              <Wrench className="w-4 h-4 text-violet-500" />
+          {/* 3. En Taller / QA - Violeta */}
+          <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs hover:border-violet-300 transition-all group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                3. En Taller / QA
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-violet-50 border border-violet-200/80 flex items-center justify-center text-violet-600 group-hover:scale-105 transition-transform">
+                <Wrench className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-bold text-slate-900">{enTaller}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Intervención y pruebas</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <p className="text-[11px] text-slate-500 font-medium">Intervención y pruebas</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">4. Concluidos</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          {/* 4. Concluidos - Verde */}
+          <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs hover:border-emerald-300 transition-all group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                4. Concluidos
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-bold text-slate-900">{concluidos}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Listos o entregados</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <p className="text-[11px] text-slate-500 font-medium">Listos o entregados</p>
+            </div>
           </div>
+
         </div>
 
         {/* Sección de Tabla y Búsqueda */}
@@ -210,24 +252,27 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Pestañas de Estado */}
+            {/* Pestañas de Estado con diferenciación visual */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
-                { id: 'TODOS', label: 'Todos' },
-                { id: 'REGISTRADO', label: '1. Recepción' },
-                { id: 'DIAGNOSTICO', label: '2. Diagnóstico' },
-                { id: 'REPARACION', label: '3. En Taller' },
-                { id: 'ENTREGADO', label: '4. Concluidos' }
+                { id: 'TODOS', label: 'Todos', dot: '' },
+                { id: 'REGISTRADO', label: '1. Recepción', dot: 'bg-[#2369A1]' },
+                { id: 'DIAGNOSTICO', label: '2. Diagnóstico', dot: 'bg-amber-500' },
+                { id: 'REPARACION', label: '3. En Taller', dot: 'bg-violet-500' },
+                { id: 'ENTREGADO', label: '4. Concluidos', dot: 'bg-emerald-500' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setFiltroEstado(tab.id)}
-                  className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
                     filtroEstado === tab.id
-                      ? 'bg-slate-900 text-white font-semibold'
+                      ? 'bg-slate-900 text-white font-semibold shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
+                  {tab.dot && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${tab.dot}`} />
+                  )}
                   {tab.label}
                 </button>
               ))}
@@ -278,7 +323,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <StatusBadge estado={orden.estadoGeneral} />
+                    <OrderStateBadge estado={orden.estadoGeneral} />
                     <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
@@ -302,42 +347,40 @@ export default function Dashboard() {
   )
 }
 
+/**
+ * Indicador puntual con diferenciación cromática normalizada:
+ * - Azul (#2369A1) para REGISTRADO
+ * - Amarillo/Ámbar para EN_DIAGNOSTICO / DIAGNOSTICADO / OBSERVADO
+ * - Sky / Violeta para Aprobado / En Reparación
+ * - Verde para REPARADO
+ * - Gris para ENTREGADO / CERRADO_SIN_REPARACION
+ */
 function StatusDot({ estado }: { estado: string }) {
   const dotColors: Record<string, string> = {
-    ENTREGADO: "bg-emerald-500",
-    REPARADO: "bg-teal-500",
-    APROBADO_PARA_REPARACION: "bg-[#2369A1]",
-    EN_REPARACION: "bg-violet-500",
-    DIAGNOSTICADO: "bg-sky-500",
-    EN_DIAGNOSTICO: "bg-sky-500",
-    REGISTRADO: "bg-amber-500",
+    // Azul para REGISTRADO
+    REGISTRADO: "bg-[#2369A1]",
+    // Amarillo / Ámbar para diagnóstico y observación
+    EN_DIAGNOSTICO: "bg-amber-500",
+    DIAGNOSTICADO: "bg-amber-500",
+    DIAGNOSTICADO_NO_APROBADO: "bg-amber-500",
     OBSERVADO: "bg-amber-500",
+    // Sky / Violeta para Taller
+    APROBADO_PARA_REPARACION: "bg-sky-500",
+    EN_REPARACION: "bg-violet-500",
+    // Verde para REPARADO
+    REPARADO: "bg-emerald-500",
+    // Gris para concluidos / entregados
+    ENTREGADO: "bg-slate-400",
+    CERRADO_SIN_REPARACION: "bg-slate-400",
+    // Rojo para inoperativo
     INOPERATIVO: "bg-rose-500",
-    CERRADO_SIN_REPARACION: "bg-rose-500",
   }
 
   return (
-    <span className={`w-2 h-2 rounded-full shrink-0 ${dotColors[estado] || 'bg-slate-400'}`} />
+    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColors[estado] || 'bg-slate-400'}`} />
   )
 }
 
 function StatusBadge({ estado }: { estado: string }) {
-  const badgeStyles: Record<string, string> = {
-    ENTREGADO: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
-    REPARADO: "bg-teal-50 text-teal-700 border-teal-200/80",
-    APROBADO_PARA_REPARACION: "bg-blue-50 text-blue-700 border-blue-200/80",
-    EN_REPARACION: "bg-violet-50 text-violet-700 border-violet-200/80",
-    DIAGNOSTICADO: "bg-sky-50 text-sky-700 border-sky-200/80",
-    EN_DIAGNOSTICO: "bg-sky-50 text-sky-700 border-sky-200/80",
-    REGISTRADO: "bg-amber-50 text-amber-700 border-amber-200/80",
-    OBSERVADO: "bg-amber-50 text-amber-700 border-amber-200/80",
-    INOPERATIVO: "bg-rose-50 text-rose-700 border-rose-200/80",
-    CERRADO_SIN_REPARACION: "bg-rose-50 text-rose-700 border-rose-200/80",
-  }
-
-  return (
-    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${badgeStyles[estado] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-      {estado.replace(/_/g, ' ')}
-    </span>
-  )
+  return <OrderStateBadge estado={estado} />
 }

@@ -20,6 +20,7 @@ import {
   RepuestoCatalogo, 
   UsuarioSistema 
 } from "@/types"
+import { OrderStateBadge } from "@/components/tickets/OrdersTable"
 import { generarInformeDiagnostico } from "@/lib/pdf/InformeDT"
 import { generarInformeTecnico } from "@/lib/pdf/Constancia"
 import { MurLogo } from "@/components/brand/MurLogo"
@@ -491,20 +492,7 @@ export default function DetalleOrdenPage() {
             <span className="font-mono text-sm font-bold text-slate-900">
               {orden.codigoDT}
             </span>
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-              orden.estadoGeneral === 'ENTREGADO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-              orden.estadoGeneral === 'REPARADO' ? 'bg-teal-50 text-teal-700 border-teal-200' :
-              orden.estadoGeneral === 'APROBADO_PARA_REPARACION' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-              orden.estadoGeneral === 'CERRADO_SIN_REPARACION' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-              orden.estadoGeneral === 'INOPERATIVO' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-              orden.estadoGeneral === 'OBSERVADO' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-              orden.estadoGeneral === 'EN_REPARACION' ? 'bg-violet-50 text-violet-700 border-violet-200' :
-              orden.estadoGeneral === 'DIAGNOSTICADO' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-              orden.estadoGeneral === 'EN_DIAGNOSTICO' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-              'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
-              {orden.estadoGeneral.replace(/_/g, ' ')}
-            </span>
+            <OrderStateBadge estado={orden.estadoGeneral} />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">

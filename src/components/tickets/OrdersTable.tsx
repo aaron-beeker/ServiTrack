@@ -113,21 +113,24 @@ export function OrdersTable({ onSelectOrder, filtroEstadoInicial = "TODOS" }: Or
         {/* Pestañas de Estado con diferenciación visual */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {[
-            { id: "TODOS", label: "Todos" },
-            { id: "REGISTRADO", label: "Registrado" },
-            { id: "EN_DIAGNOSTICO", label: "En Diagnóstico" },
-            { id: "REPARADO", label: "Reparado" },
-            { id: "ENTREGADO", label: "Entregado" }
+            { id: "TODOS", label: "Todos", dot: "" },
+            { id: "REGISTRADO", label: "Registrado", dot: "bg-[#2369A1]" },
+            { id: "EN_DIAGNOSTICO", label: "En Diagnóstico", dot: "bg-amber-500" },
+            { id: "REPARADO", label: "Reparado", dot: "bg-emerald-500" },
+            { id: "ENTREGADO", label: "Entregado", dot: "bg-slate-400" }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setFiltroEstado(tab.id)}
-              className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+              className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
                 filtroEstado === tab.id
                   ? "bg-slate-900 text-white font-semibold shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
+              {tab.dot && (
+                <span className={`w-1.5 h-1.5 rounded-full ${tab.dot}`} />
+              )}
               {tab.label}
             </button>
           ))}
@@ -278,6 +281,10 @@ export function OrderStateBadge({ estado }: { estado: EstadoGeneral | string }) 
     },
     DIAGNOSTICADO: {
       label: "DIAGNOSTICADO",
+      className: "bg-amber-50 text-amber-800 border-amber-300"
+    },
+    DIAGNOSTICADO_NO_APROBADO: {
+      label: "NO APROBADO",
       className: "bg-amber-50 text-amber-800 border-amber-300"
     },
     OBSERVADO: {
