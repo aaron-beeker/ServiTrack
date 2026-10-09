@@ -32,7 +32,7 @@ import {
 import { toast } from "sonner"
 import { useAuth } from "@/context/AuthContext"
 import { getAllClientes, createCliente } from "@/services/clienteService"
-import { getAllModelos } from "@/services/modeloService"
+import { getAllModelos, createModelo } from "@/services/modeloService"
 import { verificarExpedienteActivoEquipo, crearNuevoCaso } from "@/services/casoService"
 import { Caso, Cliente, ModeloEquipo, OrigenIncidencia, PrioridadIncidencia } from "@/types"
 
@@ -66,6 +66,15 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   const [marca, setMarca] = useState("HP")
   const [modelo, setModelo] = useState("")
   const [partNumber, setPartNumber] = useState("")
+
+  // Catálogo de Modelos e Inline
+  const [modeloSeleccionadoId, setModeloSeleccionadoId] = useState("")
+  const [creandoModelo, setCreandoModelo] = useState(false)
+  const [guardandoModelo, setGuardandoModelo] = useState(false)
+  const [nuevoModeloTipo, setNuevoModeloTipo] = useState("Laptop")
+  const [nuevoModeloMarca, setNuevoModeloMarca] = useState("")
+  const [nuevoModeloNombre, setNuevoModeloNombre] = useState("")
+  const [nuevoModeloPartNumber, setNuevoModeloPartNumber] = useState("")
 
   // Formulario: Cliente y Contrato
   const [clienteId, setClienteId] = useState("")
@@ -176,6 +185,62 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
     }
   }
 
+  // Selección automática de Modelo de Equipo (Plantilla)
+  const handleSeleccionarModelo = (id: string) => {
+    setModeloSeleccionadoId(id)
+    if (!id) return
+    const mod = modelos.find(m => (m.id || m.nombre) === id)
+    if (mod) {
+      setTipoEquipo(mod.tipo)
+      setMarca(mod.marca)
+      setModelo(mod.nombre)
+      if (mod.partNumberSugerido) {
+        setPartNumber(mod.partNumberSugerido)
+      }
+      toast.info(`Plantilla cargada: ${mod.marca} ${mod.nombre}`)
+    }
+  }
+
+  // Registrar Nuevo Modelo Rápido en Catálogo
+  const handleCrearNuevoModelo = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!nuevoModeloMarca.trim() || !nuevoModeloNombre.trim()) {
+      toast.error("Marca y Nombre del modelo son obligatorios.")
+      return
+    }
+
+    setGuardandoModelo(true)
+    try {
+      const nuevo = await createModelo({
+        marca: nuevoModeloMarca.trim(),
+        nombre: nuevoModeloNombre.trim(),
+        tipo: nuevoModeloTipo.trim() || "Laptop",
+        partNumberSugerido: nuevoModeloPartNumber.trim() || ""
+      })
+
+      const lista = await getAllModelos()
+      setModelos(lista)
+      setModeloSeleccionadoId(nuevo.id || "")
+      setTipoEquipo(nuevo.tipo)
+      setMarca(nuevo.marca)
+      setModelo(nuevo.nombre)
+      if (nuevo.partNumberSugerido) {
+        setPartNumber(nuevo.partNumberSugerido)
+      }
+
+      setCreandoModelo(false)
+      setNuevoModeloMarca("")
+      setNuevoModeloNombre("")
+      setNuevoModeloPartNumber("")
+      toast.success(`Modelo "${nuevo.marca} ${nuevo.nombre}" registrado y aplicado.`)
+    } catch (err) {
+      console.error(err)
+      toast.error("Error al registrar el modelo.")
+    } finally {
+      setGuardandoModelo(false)
+    }
+  }
+
   const handleCrearCaso = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -283,58 +348,171 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                     1. Identificación y Validación del Activo
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Validación de Trazabilidad
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setCreandoModelo(!creandoModelo)}
+                  className="text-xs font-semibold text-[#2369A1] hover:underline flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  {creandoModelo ? "Seleccionar de la lista" : "+ Nuevo Modelo en Catálogo"}
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-                {/* Input S/N */}
-                <div className="sm:col-span-7 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-slate-700">
-                      Número de Serie (S/N) <span className="text-rose-500">*</span>
-                    </Label>
-                    {serieVerificada && !casoExistente && serie && (
-                      <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Serie Verificada
-                      </span>
+              {/* Input S/N */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Número de Serie (S/N) <span className="text-rose-500">*</span>
+                  </Label>
+                  {serieVerificada && !casoExistente && serie && (
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Serie Verificada (Sin caso previo activo)
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ej. 5CD2341ABC..."
+                    value={serie}
+                    onChange={(e) => {
+                      setSerie(e.target.value.toUpperCase())
+                      setSerieVerificada(false)
+                      setCasoExistente(null)
+                    }}
+                    onBlur={() => handleVerificarSerie()}
+                    className="font-mono text-xs uppercase font-bold tracking-wider"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleVerificarSerie()}
+                    disabled={verificandoSerie || !serie.trim()}
+                    className="text-xs px-3.5 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    {verificandoSerie ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2369A1]" />
+                    ) : (
+                      <>
+                        <Search className="w-3.5 h-3.5 mr-1 text-[#2369A1]" />
+                        Validar
+                      </>
                     )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Panel Desplegable: Cargar Plantilla de Modelo o Registrar Nuevo Modelo */}
+              {creandoModelo ? (
+                <div className="bg-blue-50/40 border border-blue-200 rounded-lg p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#2369A1]" />
+                      Registrar Nuevo Modelo en Catálogo
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCreandoModelo(false)}
+                      className="text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Ej. 5CD2341ABC..."
-                      value={serie}
-                      onChange={(e) => {
-                        setSerie(e.target.value.toUpperCase())
-                        setSerieVerificada(false)
-                        setCasoExistente(null)
-                      }}
-                      onBlur={() => handleVerificarSerie()}
-                      className="font-mono text-xs uppercase font-bold tracking-wider"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-[11px] text-slate-700">Tipo de Equipo *</Label>
+                      <select
+                        value={nuevoModeloTipo}
+                        onChange={(e) => setNuevoModeloTipo(e.target.value)}
+                        className="w-full text-xs h-8 rounded border border-slate-300 bg-white px-2 mt-0.5 text-slate-800"
+                      >
+                        <option value="Laptop">Laptop</option>
+                        <option value="Desktop">Desktop</option>
+                        <option value="All-in-One">All-in-One</option>
+                        <option value="Servidor">Servidor</option>
+                        <option value="Impresora">Impresora</option>
+                        <option value="Monitor">Monitor</option>
+                        <option value="Otro">Otro Dispositivo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-[11px] text-slate-700">Marca *</Label>
+                      <Input
+                        placeholder="HP, Lenovo, Dell..."
+                        value={nuevoModeloMarca}
+                        onChange={(e) => setNuevoModeloMarca(e.target.value)}
+                        className="text-xs bg-white h-8 mt-0.5"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] text-slate-700">Modelo *</Label>
+                      <Input
+                        placeholder="Ej. ProBook 450 G9"
+                        value={nuevoModeloNombre}
+                        onChange={(e) => setNuevoModeloNombre(e.target.value)}
+                        className="text-xs bg-white h-8 mt-0.5"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] text-slate-700">P/N Sugerido</Label>
+                      <Input
+                        placeholder="Opcional"
+                        value={nuevoModeloPartNumber}
+                        onChange={(e) => setNuevoModeloPartNumber(e.target.value)}
+                        className="text-xs bg-white h-8 mt-0.5 font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
                     <Button
                       type="button"
+                      size="sm"
                       variant="outline"
-                      onClick={() => handleVerificarSerie()}
-                      disabled={verificandoSerie || !serie.trim()}
-                      className="text-xs px-3.5 shrink-0 border-slate-300 text-slate-700 hover:bg-slate-50"
+                      onClick={() => setCreandoModelo(false)}
+                      className="text-xs h-7 border-slate-300"
                     >
-                      {verificandoSerie ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2369A1]" />
-                      ) : (
-                        <>
-                          <Search className="w-3.5 h-3.5 mr-1 text-[#2369A1]" />
-                          Validar
-                        </>
-                      )}
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCrearNuevoModelo}
+                      disabled={guardandoModelo}
+                      className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs h-7 font-semibold"
+                    >
+                      {guardandoModelo ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
+                      Guardar y Usar Modelo
                     </Button>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Cargar Plantilla / Modelo Frecuente
+                    </Label>
+                    <span className="text-[10px] text-slate-400">
+                      Autocompleta Tipo, Marca, Modelo y P/N
+                    </span>
+                  </div>
+                  <select
+                    value={modeloSeleccionadoId}
+                    onChange={(e) => handleSeleccionarModelo(e.target.value)}
+                    className="w-full text-xs h-9 rounded-md border border-slate-200 bg-white px-3 text-slate-800 focus:outline-none focus:border-[#2369A1]"
+                  >
+                    <option value="">-- Seleccionar modelo del catálogo o ingresar manual abajo --</option>
+                    {modelos.map(m => (
+                      <option key={m.id || m.nombre} value={m.id || m.nombre}>
+                        [{m.marca}] {m.nombre} ({m.tipo}){m.partNumberSugerido ? ` • P/N: ${m.partNumberSugerido}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-                {/* Tipo de Equipo */}
-                <div className="sm:col-span-5 space-y-1.5">
+              {/* Datos del Equipo (Tipo, Marca, Modelo, P/N) */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-700">Tipo de Dispositivo</Label>
                   <select
                     value={tipoEquipo}
@@ -343,43 +521,47 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                   >
                     <option value="Laptop">Laptop / Portátil</option>
                     <option value="Desktop">Desktop / Computadora</option>
+                    <option value="All-in-One">All-in-One</option>
                     <option value="Servidor">Servidor</option>
                     <option value="Impresora">Impresora / Multifuncional</option>
                     <option value="Monitor">Monitor / Pantalla</option>
                     <option value="Otro">Otro Dispositivo</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Marca, Modelo y Part Number */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Marca</Label>
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Marca <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     value={marca}
                     onChange={(e) => setMarca(e.target.value)}
                     placeholder="HP, Lenovo, Dell..."
-                    className="text-xs"
+                    className="text-xs bg-white"
                     required
                   />
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Modelo</Label>
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Modelo <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     value={modelo}
                     onChange={(e) => setModelo(e.target.value)}
                     placeholder="Ej. ProBook 450 G9"
-                    className="text-xs"
+                    className="text-xs bg-white"
                     required
                   />
                 </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-700">Part Number (P/N)</Label>
                   <Input
                     value={partNumber}
                     onChange={(e) => setPartNumber(e.target.value)}
                     placeholder="Opcional"
-                    className="text-xs font-mono"
+                    className="text-xs font-mono bg-white"
                   />
                 </div>
               </div>
