@@ -273,6 +273,12 @@ export default function UsuariosPage() {
                 Panel de Control
               </button>
               <button 
+                onClick={() => router.push('/casos')}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Expedientes (Casos)
+              </button>
+              <button 
                 onClick={() => router.push('/tickets')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
               >

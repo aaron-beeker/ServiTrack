@@ -13,9 +13,12 @@ import {
   Clock,
   Wrench,
   AlertCircle,
-  FileText
+  FileText,
+  FolderOpen,
+  ShieldCheck
 } from "lucide-react"
 import { TicketModal } from "@/components/tickets/TicketModal"
+import { NuevoCasoModal } from "@/components/casos/NuevoCasoModal"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
 import { useAuth } from "@/context/AuthContext"
@@ -99,6 +102,13 @@ export default function Dashboard() {
                 Panel de Control
               </button>
               <button 
+                onClick={() => router.push('/casos')}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-[#2369A1]" />
+                Expedientes (Casos)
+              </button>
+              <button 
                 onClick={() => router.push('/tickets')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
               >
@@ -121,7 +131,7 @@ export default function Dashboard() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button 
               onClick={cargarOrdenes}
               disabled={loading}
@@ -131,10 +141,17 @@ export default function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#2369A1]' : ''}`} />
             </button>
 
+            <NuevoCasoModal>
+              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" />
+                Aperturar Caso
+              </Button>
+            </NuevoCasoModal>
+
             <TicketModal onSuccess={() => cargarOrdenes()}>
-              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-xs transition-colors">
-                <Plus className="w-4 h-4 mr-1.5" />
-                Nueva Orden
+              <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold px-3 py-2 rounded-lg shadow-xs transition-colors">
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Nueva OS
               </Button>
             </TicketModal>
 

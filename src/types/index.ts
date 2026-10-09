@@ -147,3 +147,160 @@ export interface ModeloEquipo {
   tipo: string;
   partNumberSugerido?: string;
 }
+
+// ============================================================================
+// MODELO ENTIDAD PRINCIPAL: EXPEDIENTE ÚNICO (CASO) Y CICLO DE VIDA COMPLETO
+// ============================================================================
+
+export type EstadoCaso = 
+  | 'ABIERTO'                   // Caso aperturado con incidencia registrada
+  | 'EN_DIAGNOSTICO'           // En evaluación técnica formal (DT)
+  | 'PENDIENTE_DE_APROBACION'  // DT concluido, esperando aprobación de cliente o jefatura
+  | 'EN_REPARACION'            // OS en ejecución técnica
+  | 'EN_PRUEBAS'               // QA y pruebas de calidad
+  | 'ENTREGADO'                // Equipo entregado al cliente
+  | 'EN_GARANTIA'              // Plazo de garantía activo
+  | 'CERRADO'                  // Liquidación técnica final y cierre definitivo
+  | 'CERRADO_SIN_REPARACION';  // Rechazo de cotización o devolución sin reparación
+
+export type OrigenIncidencia = 'TALLER' | 'ALQUILER' | 'RECLAMO_GARANTIA';
+export type PrioridadIncidencia = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+export type TipoOrdenServicio = 'CORRECTIVA' | 'PREVENTIVA' | 'GARANTIA' | 'INSTALACION' | 'MANTENIMIENTO' | 'INSPECCION';
+export type EstadoOrdenServicio = 'PENDIENTE' | 'ASIGNADA' | 'EN_EJECUCION' | 'EN_PRUEBAS' | 'FINALIZADA';
+export type EstadoDiagnostico = 'BORRADOR' | 'EN_EVALUACION' | 'CONCLUIDO' | 'APROBADO' | 'RECHAZADO';
+
+export interface IncidenciaCaso {
+  id: string; // e.g. "INC-001"
+  codigoINC: string;
+  fecha: string;
+  reportadoPor: string;
+  descripcion: string;
+  prioridad: PrioridadIncidencia;
+  origen: OrigenIncidencia;
+  esReingresoGarantia: boolean;
+  vinculoIntervencionPrevia?: string; // id de OS o DT previa
+  aplicaGarantia: boolean;
+  requiereAnalisisTecnico: boolean; // true: ruta 2B (DT formal), false: ruta 2A (Atención Simple)
+  estado: 'REGISTRADA' | 'EN_ATENCION' | 'RESUELTA';
+  creadoEl: string;
+}
+
+export interface DiagnosticoTecnicoCaso {
+  id: string; // e.g. "DT-001"
+  codigoDT: string;
+  incidenciaId?: string;
+  fecha: string;
+  tecnicoResponsable: string;
+  tipoFalla: 'HARDWARE' | 'SOFTWARE' | 'OPERATIVO';
+  hallazgos: string; // Causa raíz
+  diagnosticoDetallado: string;
+  danosFisicos?: string;
+  requiereRepuestos: boolean;
+  repuestosRequeridos: RepuestoItem[];
+  recomendaciones?: string;
+  solucionPropuesta?: string;
+  estado: EstadoDiagnostico;
+  aprobacionCliente?: {
+    fechaDecision: string | null;
+    aprobado: boolean;
+    motivoRechazo?: string | null;
+    registradoPor?: string | null;
+  } | null;
+  informePdfUrl?: string | null;
+  creadoEl: string;
+}
+
+export interface OrdenServicioTrabajo {
+  id: string; // e.g. "OS-001"
+  codigoOS: string;
+  incidenciaId?: string;
+  diagnosticoId?: string;
+  tipo: TipoOrdenServicio;
+  tecnicoAsignado: string;
+  actividades: string;
+  horasHombre: number;
+  estado: EstadoOrdenServicio;
+  fechaInicio?: string;
+  fechaFin?: string;
+  pruebasQA?: {
+    superoQA: boolean;
+    observacionesQA?: string;
+    fechaPruebas?: string;
+  } | null;
+  firmaDigitalTecnico?: string | null;
+  creadoEl: string;
+}
+
+export interface ConstanciaAtencionSimple {
+  id: string; // e.g. "CONST-001"
+  codigoConstancia: string;
+  incidenciaId?: string;
+  fecha: string;
+  tecnicoResponsable: string;
+  motivoSoporte: string; // Limpieza, Configuración, Reinicio, Sustitución temporal, Soporte menor
+  actividadesRealizadas: string;
+  resultado: string;
+  firmaReceptor?: string | null;
+  creadoEl: string;
+}
+
+export interface GarantiaCaso {
+  aplicaGarantia: boolean;
+  diasGarantia: number;
+  fechaInicioGarantia?: string;
+  fechaVencimientoGarantia?: string;
+  activa: boolean;
+  reingresosContador: number;
+}
+
+export interface ActividadHistorial {
+  id: string;
+  fecha: string;
+  autor: string;
+  tipo: 
+    | 'APERTURA' 
+    | 'INCIDENCIA' 
+    | 'DIAGNOSTICO' 
+    | 'APROBACION' 
+    | 'RECHAZO' 
+    | 'ORDEN_SERVICIO' 
+    | 'ATENCION_SIMPLE' 
+    | 'ENTREGA' 
+    | 'GARANTIA_ACTIVADA' 
+    | 'REINGRESO_GARANTIA' 
+    | 'CIERRE';
+  titulo: string;
+  detalle: string;
+  referenciaId?: string;
+}
+
+export interface Caso {
+  id: string; // e.g. "CASO-000001"
+  codigoCaso: string;
+  estado: EstadoCaso;
+  origen: OrigenIncidencia; // TALLER | ALQUILER | RECLAMO_GARANTIA
+  cliente: ClienteOrden;
+  contratoAlquiler?: string; // Número o ref de contrato de alquiler si aplica
+  equipo: EquipoOrden;
+  responsableApertura: string;
+  fechaApertura: string;
+  fechaCierre?: string | null;
+  
+  // Expediente Único (Documentos y sub-entidades integradas)
+  incidencias: IncidenciaCaso[];
+  diagnosticos: DiagnosticoTecnicoCaso[];
+  ordenesServicio: OrdenServicioTrabajo[];
+  constancias: ConstanciaAtencionSimple[];
+  garantia: GarantiaCaso;
+  historial: ActividadHistorial[];
+
+  // Liquidación final
+  liquidacionFinal?: {
+    fechaLiquidacion: string;
+    observaciones: string;
+    firmadoPor: string;
+  } | null;
+
+  creadoEl: string;
+  actualizadoEl: string;
+}
