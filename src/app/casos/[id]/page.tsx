@@ -121,11 +121,20 @@ export default function ExpedienteCasoPage() {
   const [dtRecomendaciones, setDtRecomendaciones] = useState("")
   const [dtTecnico, setDtTecnico] = useState("")
 
-  // Formulario: Decisión Propuesta Técnica
+  // Formulario: Decisión Propuesta Técnica y Generación de OS
   const [decisionAprobado, setDecisionAprobado] = useState(true)
   const [decisionMotivoRechazo, setDecisionMotivoRechazo] = useState("")
+  const [generarOSAlAprobar, setGenerarOSAlAprobar] = useState(true)
+  const [modoCodigoOSDecision, setModoCodigoOSDecision] = useState<"AUTO" | "MANUAL">("AUTO")
+  const [codigoOSManualDecision, setCodigoOSManualDecision] = useState("")
+  const [osTipoDecision, setOsTipoDecision] = useState<TipoOrdenServicio>("CORRECTIVA")
+  const [osTecnicoDecision, setOsTecnicoDecision] = useState("")
+  const [osActividadesDecision, setOsActividadesDecision] = useState("")
+  const [osHorasDecision, setOsHorasDecision] = useState(2)
 
-  // Formulario: Orden de Servicio (OS)
+  // Formulario: Orden de Servicio (OS en Fase 3)
+  const [modoCodigoOS, setModoCodigoOS] = useState<"AUTO" | "MANUAL">("AUTO")
+  const [codigoOSManual, setCodigoOSManual] = useState("")
   const [osTipo, setOsTipo] = useState<TipoOrdenServicio>("CORRECTIVA")
   const [osTecnico, setOsTecnico] = useState("")
   const [osActividades, setOsActividades] = useState("")
@@ -184,6 +193,7 @@ export default function ExpedienteCasoPage() {
       setConstanciaTecnico(operadorNombre)
       setDtTecnico(operadorNombre)
       setOsTecnico(operadorNombre)
+      setOsTecnicoDecision(operadorNombre)
     }
   }, [operadorNombre])
 
@@ -257,15 +267,49 @@ export default function ExpedienteCasoPage() {
   const handleGuardarDecisionDT = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedDTForDecision) return
+
+    if (!decisionAprobado && !decisionMotivoRechazo.trim()) {
+      toast.error("Por favor indique el motivo del rechazo.")
+      return
+    }
+
+    if (decisionAprobado && generarOSAlAprobar) {
+      if (modoCodigoOSDecision === "MANUAL" && !codigoOSManualDecision.trim()) {
+        toast.error("Por favor digite el código de Orden de Servicio oficial / externo.")
+        return
+      }
+      if (!osActividadesDecision.trim()) {
+        toast.error("Por favor describa las actividades a realizar en la Orden de Servicio.")
+        return
+      }
+    }
+
     try {
-      await registrarDecisionPropuestaTecnica(
+      const nuevaOS = await registrarDecisionPropuestaTecnica(
         codigo,
         selectedDTForDecision.id,
         decisionAprobado,
         decisionAprobado ? undefined : decisionMotivoRechazo,
-        operadorNombre
+        operadorNombre,
+        (decisionAprobado && generarOSAlAprobar) ? {
+          codigoOSManual: modoCodigoOSDecision === "MANUAL" ? codigoOSManualDecision.trim().toUpperCase() : undefined,
+          tipo: osTipoDecision,
+          tecnicoAsignado: osTecnicoDecision || operadorNombre,
+          actividades: osActividadesDecision.trim(),
+          horasHombreEstimadas: Number(osHorasDecision) || 1
+        } : undefined
       )
-      toast.success(decisionAprobado ? "Propuesta técnica aprobada." : "Rechazo registrado.")
+
+      if (decisionAprobado) {
+        if (nuevaOS) {
+          toast.success(`Propuesta aprobada y Orden de Servicio ${nuevaOS.codigoOS} aperturada con éxito. Caso en Reparación.`)
+        } else {
+          toast.success("Propuesta técnica aprobada. Habilitado para generar Orden de Servicio.")
+        }
+      } else {
+        toast.info("Rechazo registrado. Expediente cerrado sin reparación.")
+      }
+
       setModalDecisionDTOpen(false)
     } catch (err: any) {
       toast.error(err.message || "Error al registrar decisión.")
@@ -274,12 +318,17 @@ export default function ExpedienteCasoPage() {
 
   const handleGuardarOS = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (modoCodigoOS === "MANUAL" && !codigoOSManual.trim()) {
+      toast.error("Por favor digite el código de Orden de Servicio oficial / externo.")
+      return
+    }
     if (!osActividades.trim()) {
       toast.error("Ingresa las actividades a ejecutar.")
       return
     }
     try {
       const nuevaOs = await generarOrdenServicioTrabajo(codigo, {
+        codigoOSManual: modoCodigoOS === "MANUAL" ? codigoOSManual.trim().toUpperCase() : undefined,
         tipo: osTipo,
         tecnicoAsignado: osTecnico || operadorNombre,
         actividades: osActividades,
@@ -288,6 +337,8 @@ export default function ExpedienteCasoPage() {
       })
       toast.success(`Orden de Servicio ${nuevaOs.codigoOS} generada. Caso en Reparación.`)
       setModalOSOpen(false)
+      setCodigoOSManual("")
+      setModoCodigoOS("AUTO")
     } catch (err: any) {
       toast.error(err.message || "Error al generar orden de trabajo.")
     }
@@ -795,11 +846,19 @@ export default function ExpedienteCasoPage() {
                                 size="sm"
                                 onClick={() => {
                                   setSelectedDTForDecision(dt)
+                                  setDecisionAprobado(true)
+                                  setGenerarOSAlAprobar(true)
+                                  setModoCodigoOSDecision("AUTO")
+                                  setCodigoOSManualDecision("")
+                                  setOsActividadesDecision(dt.solucionPropuesta || dt.recomendaciones || `Ejecución de trabajos según diagnóstico técnico ${dt.codigoDT}`)
+                                  setOsTipoDecision("CORRECTIVA")
+                                  setOsTecnicoDecision(operadorNombre)
+                                  setOsHorasDecision(2)
                                   setModalDecisionDTOpen(true)
                                 }}
-                                className="bg-[#2369A1] text-white text-xs h-7"
+                                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs h-7"
                               >
-                                Decisión Cliente
+                                Decisión Cliente / OS
                               </Button>
                             )}
                           </div>
@@ -1318,58 +1377,200 @@ export default function ExpedienteCasoPage() {
       </Dialog>
 
       {/* ========================================================================= */}
-      {/* MODAL DECISIÓN CLIENTE SOBRE DT */}
+      {/* MODAL DECISIÓN CLIENTE SOBRE DT Y APERTURA DE OS */}
       {/* ========================================================================= */}
       <Dialog open={modalDecisionDTOpen} onOpenChange={setModalDecisionDTOpen}>
-        <DialogContent className="max-w-md font-sans">
+        <DialogContent className="max-w-xl font-sans max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               Aprobación de Propuesta Técnica ({selectedDTForDecision?.codigoDT})
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              El cliente o jefatura autoriza la intervención técnica o rechaza la cotización.
+              El cliente o jefatura autoriza la intervención técnica o rechaza la propuesta.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleGuardarDecisionDT} className="space-y-3 pt-2">
+          <form onSubmit={handleGuardarDecisionDT} className="space-y-4 pt-2">
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setDecisionAprobado(true)}
-                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center ${
+                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${
                   decisionAprobado 
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600" 
-                    : "border-slate-200 text-slate-600"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600 shadow-2xs" 
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                ✓ APROBAR Propuesta
+                ✓ APROBAR Intervención
               </button>
               <button
                 type="button"
                 onClick={() => setDecisionAprobado(false)}
-                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center ${
+                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${
                   !decisionAprobado 
-                    ? "border-rose-600 bg-rose-50 text-rose-800 ring-1 ring-rose-600" 
-                    : "border-slate-200 text-slate-600"
+                    ? "border-rose-600 bg-rose-50 text-rose-800 ring-1 ring-rose-600 shadow-2xs" 
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                ✕ RECHAZAR Propuesta
+                ✕ RECHAZAR Presupuesto
               </button>
             </div>
 
             {!decisionAprobado && (
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Motivo del Rechazo *</Label>
+              <div className="space-y-1 bg-rose-50/50 p-3 rounded-lg border border-rose-200">
+                <Label className="text-xs font-semibold text-rose-900">Motivo del Rechazo *</Label>
                 <Input
                   value={decisionMotivoRechazo}
                   onChange={(e) => setDecisionMotivoRechazo(e.target.value)}
-                  placeholder="Ej. Presupuesto excede límite comercial"
-                  className="text-xs"
+                  placeholder="Ej. Presupuesto excede límite comercial o cliente no autoriza cambio de componentes"
+                  className="text-xs bg-white"
                   required={!decisionAprobado}
                 />
-                <p className="text-[10px] text-rose-600 mt-0.5">
-                  El caso pasará a CERRADO SIN REPARACIÓN y se emitirá acta de devolución.
+                <p className="text-[10px] text-rose-600 mt-1">
+                  El expediente pasará a <b>CERRADO SIN REPARACIÓN</b> y se habilitará la emisión del Informe Técnico y devolución del activo.
                 </p>
+              </div>
+            )}
+
+            {decisionAprobado && (
+              <div className="p-4 rounded-xl border border-blue-200/80 bg-blue-50/40 space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-[#2369A1]" />
+                    <span className="text-xs font-bold text-slate-800">
+                      Apertura de Orden de Servicio (Fase 3 - Taller)
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={generarOSAlAprobar}
+                      onChange={(e) => setGenerarOSAlAprobar(e.target.checked)}
+                      className="rounded border-slate-300 text-[#2369A1] focus:ring-[#2369A1] w-3.5 h-3.5"
+                    />
+                    <span>Aperturar OS ahora</span>
+                  </label>
+                </div>
+
+                {generarOSAlAprobar && (
+                  <div className="space-y-3 text-xs">
+                    {/* Selector Modo Código OS */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-700">
+                        Código / Numeración de la Orden de Servicio:
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setModoCodigoOSDecision("AUTO")}
+                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                            modoCodigoOSDecision === "AUTO"
+                              ? "border-[#2369A1] bg-white ring-1 ring-[#2369A1] text-slate-900 shadow-2xs"
+                              : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
+                            <span className={`w-2 h-2 rounded-full ${modoCodigoOSDecision === "AUTO" ? "bg-[#2369A1]" : "bg-slate-300"}`} />
+                            Autogenerar correlativo
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            El sistema asigna la secuencia automática (ej: OS-001)
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setModoCodigoOSDecision("MANUAL")}
+                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                            modoCodigoOSDecision === "MANUAL"
+                              ? "border-[#2369A1] bg-white ring-1 ring-[#2369A1] text-slate-900 shadow-2xs"
+                              : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
+                            <span className={`w-2 h-2 rounded-full ${modoCodigoOSDecision === "MANUAL" ? "bg-[#2369A1]" : "bg-slate-300"}`} />
+                            Digitar manual (ERP / SAP)
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Código provisto por otra área (Facturación / Comercial)
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Input Código Manual */}
+                    {modoCodigoOSDecision === "MANUAL" && (
+                      <div className="space-y-1 bg-white p-2.5 rounded-lg border border-amber-200">
+                        <Label className="text-xs font-bold text-amber-900 flex items-center justify-between">
+                          <span>Código OS Oficial / Externo *</span>
+                          <span className="text-[10px] font-normal text-amber-700">Emitido por otra área</span>
+                        </Label>
+                        <Input
+                          value={codigoOSManualDecision}
+                          onChange={(e) => setCodigoOSManualDecision(e.target.value.toUpperCase())}
+                          placeholder="Ej. OS-2024-8931, SAP-44019, ERP-5012"
+                          className="text-xs font-mono font-bold uppercase tracking-wider bg-amber-50/20"
+                          required={modoCodigoOSDecision === "MANUAL"}
+                        />
+                        <p className="text-[10px] text-slate-500">
+                          Se mantendrá la trazabilidad directa con la orden registrada en el ERP u otra área.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">Tipo de Trabajo</Label>
+                        <select
+                          value={osTipoDecision}
+                          onChange={(e) => setOsTipoDecision(e.target.value as any)}
+                          className="w-full text-xs h-8 rounded border border-slate-200 px-2 bg-white"
+                        >
+                          <option value="CORRECTIVA">Correctiva</option>
+                          <option value="PREVENTIVA">Preventiva</option>
+                          <option value="GARANTIA">Garantía</option>
+                          <option value="INSTALACION">Instalación</option>
+                          <option value="MANTENIMIENTO">Mantenimiento</option>
+                          <option value="INSPECCION">Inspección</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">Técnico Asignado</Label>
+                        <Input
+                          value={osTecnicoDecision}
+                          onChange={(e) => setOsTecnicoDecision(e.target.value)}
+                          className="text-xs bg-white"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Actividades a Realizar *</Label>
+                      <textarea
+                        value={osActividadesDecision}
+                        onChange={(e) => setOsActividadesDecision(e.target.value)}
+                        placeholder="Describa el trabajo operativo a realizar..."
+                        rows={2}
+                        className="w-full text-xs border border-slate-200 rounded-md p-2 resize-none bg-white"
+                        required={generarOSAlAprobar}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Horas Hombre Estimadas</Label>
+                      <Input
+                        type="number"
+                        value={osHorasDecision}
+                        onChange={(e) => setOsHorasDecision(Number(e.target.value))}
+                        className="text-xs bg-white w-32"
+                        min={0.5}
+                        step={0.5}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1377,8 +1578,14 @@ export default function ExpedienteCasoPage() {
               <Button type="button" variant="outline" size="sm" onClick={() => setModalDecisionDTOpen(false)} className="text-xs">
                 Cancelar
               </Button>
-              <Button type="submit" size="sm" className="bg-[#2369A1] text-xs">
-                Registrar Decisión
+              <Button 
+                type="submit" 
+                size="sm" 
+                className={decisionAprobado ? "bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs" : "bg-rose-600 hover:bg-rose-700 text-white text-xs"}
+              >
+                {decisionAprobado 
+                  ? (generarOSAlAprobar ? "Aprobar y Aperturar Orden de Servicio" : "Aprobar Propuesta Técnica") 
+                  : "Confirmar Rechazo y Cerrar"}
               </Button>
             </DialogFooter>
           </form>
@@ -1389,7 +1596,7 @@ export default function ExpedienteCasoPage() {
       {/* MODAL 3: GENERAR ORDEN DE SERVICIO (OS) */}
       {/* ========================================================================= */}
       <Dialog open={modalOSOpen} onOpenChange={setModalOSOpen}>
-        <DialogContent className="max-w-md font-sans">
+        <DialogContent className="max-w-lg font-sans max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               3. Generar Orden de Servicio (OS)
@@ -1399,14 +1606,78 @@ export default function ExpedienteCasoPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleGuardarOS} className="space-y-3 pt-2">
+          <form onSubmit={handleGuardarOS} className="space-y-3.5 pt-2">
+            {/* Selector de Origen de Código OS */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                Código / Numeración de la Orden de Servicio:
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModoCodigoOS("AUTO")}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    modoCodigoOS === "AUTO"
+                      ? "border-violet-600 bg-violet-50/50 ring-1 ring-violet-600 text-slate-900 shadow-2xs"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
+                    <span className={`w-2 h-2 rounded-full ${modoCodigoOS === "AUTO" ? "bg-violet-600" : "bg-slate-300"}`} />
+                    Autogenerar correlativo
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    El sistema asigna correlativo automático (ej: OS-001)
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModoCodigoOS("MANUAL")}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    modoCodigoOS === "MANUAL"
+                      ? "border-violet-600 bg-violet-50/50 ring-1 ring-violet-600 text-slate-900 shadow-2xs"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
+                    <span className={`w-2 h-2 rounded-full ${modoCodigoOS === "MANUAL" ? "bg-violet-600" : "bg-slate-300"}`} />
+                    Digitar manual (ERP / SAP)
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Proviene de otra área (SAP, ERP, Comercial o Facturación)
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Input Código Manual si aplica */}
+            {modoCodigoOS === "MANUAL" && (
+              <div className="space-y-1 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200">
+                <Label className="text-xs font-bold text-amber-900 flex items-center justify-between">
+                  <span>Código OS Oficial / Externo *</span>
+                  <span className="text-[10px] font-normal text-amber-700">Emitido por otra área</span>
+                </Label>
+                <Input
+                  value={codigoOSManual}
+                  onChange={(e) => setCodigoOSManual(e.target.value.toUpperCase())}
+                  placeholder="Ej. OS-2024-8931, SAP-44019, COT-1092"
+                  className="text-xs font-mono font-bold uppercase tracking-wider bg-white"
+                  required={modoCodigoOS === "MANUAL"}
+                />
+                <p className="text-[10px] text-slate-500">
+                  Este número mantendrá la trazabilidad cruzada exacta con el sistema externo.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold">Tipo de Trabajo</Label>
                 <select
                   value={osTipo}
                   onChange={(e) => setOsTipo(e.target.value as any)}
-                  className="w-full text-xs h-8 rounded border border-slate-200 px-2"
+                  className="w-full text-xs h-8 rounded border border-slate-200 px-2 bg-white"
                 >
                   <option value="CORRECTIVA">Correctiva</option>
                   <option value="PREVENTIVA">Preventiva</option>
@@ -1422,7 +1693,7 @@ export default function ExpedienteCasoPage() {
                 <Input
                   value={osTecnico}
                   onChange={(e) => setOsTecnico(e.target.value)}
-                  className="text-xs"
+                  className="text-xs bg-white"
                   required
                 />
               </div>
@@ -1435,7 +1706,7 @@ export default function ExpedienteCasoPage() {
                 onChange={(e) => setOsActividades(e.target.value)}
                 placeholder="Describa el trabajo a ejecutar por el técnico..."
                 rows={3}
-                className="w-full text-xs border border-slate-200 rounded-md p-2 resize-none"
+                className="w-full text-xs border border-slate-200 rounded-md p-2 resize-none bg-white"
                 required
               />
             </div>
@@ -1446,7 +1717,7 @@ export default function ExpedienteCasoPage() {
                 type="number"
                 value={osHorasEstimadas}
                 onChange={(e) => setOsHorasEstimadas(Number(e.target.value))}
-                className="text-xs"
+                className="text-xs bg-white w-32"
                 min={0.5}
                 step={0.5}
               />

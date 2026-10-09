@@ -17,7 +17,6 @@ import {
   FolderOpen,
   ShieldCheck
 } from "lucide-react"
-import { TicketModal } from "@/components/tickets/TicketModal"
 import { NuevoCasoModal } from "@/components/casos/NuevoCasoModal"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
@@ -142,18 +141,11 @@ export default function Dashboard() {
             </button>
 
             <NuevoCasoModal>
-              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5">
+              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5">
                 <FolderOpen className="w-3.5 h-3.5" />
                 Aperturar Caso
               </Button>
             </NuevoCasoModal>
-
-            <TicketModal onSuccess={() => cargarOrdenes()}>
-              <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold px-3 py-2 rounded-lg shadow-xs transition-colors">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Nueva OS
-              </Button>
-            </TicketModal>
 
             <div className="border-l border-slate-200 pl-3">
               <UserMenu />

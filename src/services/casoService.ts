@@ -529,17 +529,27 @@ export const registrarDiagnosticoTecnico = async (
 };
 
 /**
- * PASO 2B (Decisión): Cliente o jefatura aprueba o rechaza la propuesta técnica
- * - Si Rechaza: CERRADO_SIN_REPARACION -> Fin
- * - Si Aprueba: Pasa a estado para generar OS
+ * PASO 2B (Decisión) & Transición a FASE 3:
+ * Cliente o jefatura aprueba o rechaza la propuesta técnica del Diagnóstico (DT).
+ * - Si Rechaza: Estado pasa a 'CERRADO_SIN_REPARACION' -> Fin.
+ * - Si Aprueba: Puede generar inmediatamente la Orden de Servicio (OS)
+ *   (autogenerada o digitada manualmente con el código oficial proveniente de otra área/ERP).
+ *   Si se genera la OS, el estado pasa directamente a 'EN_REPARACION'.
  */
 export const registrarDecisionPropuestaTecnica = async (
   codigoCaso: string,
   diagnosticoId: string,
   aprobado: boolean,
   motivoRechazo?: string,
-  registradoPor?: string
-): Promise<void> => {
+  registradoPor?: string,
+  generarOSInmediata?: {
+    codigoOSManual?: string;
+    tipo: TipoOrdenServicio;
+    tecnicoAsignado: string;
+    actividades: string;
+    horasHombreEstimadas?: number;
+  }
+): Promise<OrdenServicioTrabajo | null> => {
   const caso = await getCasoByCodigo(codigoCaso);
   if (!caso) throw new Error(`Caso ${codigoCaso} no encontrado.`);
 
@@ -561,40 +571,92 @@ export const registrarDecisionPropuestaTecnica = async (
     return dt;
   });
 
-  const nuevoEstadoCaso: EstadoCaso = aprobado 
-    ? 'PENDIENTE_DE_APROBACION' 
-    : 'CERRADO_SIN_REPARACION';
+  let nuevaOS: OrdenServicioTrabajo | null = null;
+  let ordenesActualizadas = caso.ordenesServicio || [];
 
-  const nuevaActividad: ActividadHistorial = {
-    id: `ACT-${Date.now()}`,
-    fecha: ahora,
-    autor: registradoPor || 'Cliente',
-    tipo: aprobado ? 'APROBACION' : 'RECHAZO',
-    titulo: aprobado ? `Propuesta Técnica ${diagnosticoId} Aprobada` : `Propuesta Técnica ${diagnosticoId} Rechazada`,
-    detalle: aprobado 
-      ? 'Cliente/jefatura autoriza intervención técnica y repuestos.' 
-      : `Rechazo registrado: ${motivoRechazo || 'Sin detalle'}. Emitir devolución con Informe Técnico.`,
-    referenciaId: diagnosticoId
-  };
+  if (aprobado && generarOSInmediata) {
+    const siguienteIndice = ordenesActualizadas.length + 1;
+    const osId = generarOSInmediata.codigoOSManual?.trim() 
+      ? generarOSInmediata.codigoOSManual.trim().toUpperCase() 
+      : `OS-${siguienteIndice.toString().padStart(3, '0')}`;
+
+    if (ordenesActualizadas.some(o => o.codigoOS === osId)) {
+      throw new Error(`Ya existe una Orden de Servicio con el código ${osId} en este expediente.`);
+    }
+
+    nuevaOS = {
+      id: osId,
+      codigoOS: osId,
+      diagnosticoId,
+      tipo: generarOSInmediata.tipo || 'CORRECTIVA',
+      tecnicoAsignado: generarOSInmediata.tecnicoAsignado,
+      actividades: generarOSInmediata.actividades.trim(),
+      horasHombre: generarOSInmediata.horasHombreEstimadas || 1,
+      estado: 'EN_EJECUCION',
+      fechaInicio: ahora,
+      pruebasQA: null,
+      creadoEl: ahora
+    };
+    ordenesActualizadas = [...ordenesActualizadas, nuevaOS];
+  }
+
+  const nuevoEstadoCaso: EstadoCaso = !aprobado 
+    ? 'CERRADO_SIN_REPARACION' 
+    : nuevaOS 
+      ? 'EN_REPARACION' 
+      : 'PENDIENTE_DE_APROBACION';
+
+  const actividadesHistorial: ActividadHistorial[] = [
+    {
+      id: `ACT-${Date.now()}-1`,
+      fecha: ahora,
+      autor: registradoPor || 'Cliente',
+      tipo: aprobado ? 'APROBACION' : 'RECHAZO',
+      titulo: aprobado ? `Propuesta Técnica ${diagnosticoId} Aprobada` : `Propuesta Técnica ${diagnosticoId} Rechazada`,
+      detalle: aprobado 
+        ? `Cliente/jefatura autoriza intervención técnica. ${nuevaOS ? `Se apertura automáticamente la Orden de Servicio ${nuevaOS.codigoOS}.` : 'Habilitada para generar OS.'}` 
+        : `Rechazo registrado: ${motivoRechazo || 'Sin detalle'}. Emitir devolución con Informe Técnico.`,
+      referenciaId: diagnosticoId
+    }
+  ];
+
+  if (nuevaOS) {
+    actividadesHistorial.push({
+      id: `ACT-${Date.now()}-2`,
+      fecha: ahora,
+      autor: registradoPor || 'Cliente',
+      tipo: 'ORDEN_SERVICIO',
+      titulo: `Apertura de Orden de Servicio ${nuevaOS.codigoOS} (${nuevaOS.tipo})`,
+      detalle: `Trabajo asignado a: ${nuevaOS.tecnicoAsignado}. Actividades: ${nuevaOS.actividades}. Estado pasa a En Reparación.`,
+      referenciaId: nuevaOS.codigoOS
+    });
+  }
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
   await updateDoc(docRef, {
     diagnosticos: diagnosticosActualizados,
+    ordenesServicio: ordenesActualizadas,
     estado: nuevoEstadoCaso,
     fechaCierre: aprobado ? null : ahora,
-    historial: [nuevaActividad, ...(caso.historial || [])],
+    historial: [...actividadesHistorial, ...(caso.historial || [])],
     actualizadoEl: ahora
   });
+
+  return nuevaOS;
 };
 
 /**
  * PASO 3 (Diagrama): EJECUCIÓN DE TRABAJO (ORDEN DE SERVICIO - OS)
  * Generar Orden de Servicio (OS-XXX): Correctiva, Preventiva, Garantía, etc.
+ * Admite:
+ * - Autogeneración de código OS (ej. OS-001)
+ * - Digitación manual de código OS externo (ej. OS-2026-8910 de SAP, ERP u otra área).
  * Actualiza estado del Caso a 'EN_REPARACION'.
  */
 export const generarOrdenServicioTrabajo = async (
   codigoCaso: string,
   params: {
+    codigoOSManual?: string; // Si viene digitado desde otra área / ERP
     diagnosticoId?: string;
     incidenciaId?: string;
     tipo: TipoOrdenServicio;
@@ -609,7 +671,13 @@ export const generarOrdenServicioTrabajo = async (
 
   const ahora = new Date().toISOString();
   const siguienteIndice = (caso.ordenesServicio?.length || 0) + 1;
-  const osId = `OS-${siguienteIndice.toString().padStart(3, '0')}`;
+  const osId = params.codigoOSManual?.trim() 
+    ? params.codigoOSManual.trim().toUpperCase() 
+    : `OS-${siguienteIndice.toString().padStart(3, '0')}`;
+
+  if (caso.ordenesServicio?.some(o => o.codigoOS === osId)) {
+    throw new Error(`Ya existe una Orden de Servicio con el código ${osId} en este expediente.`);
+  }
 
   const nuevaOS: OrdenServicioTrabajo = {
     id: osId,

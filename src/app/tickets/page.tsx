@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Plus } from "lucide-react"
-import { TicketModal } from "@/components/tickets/TicketModal"
+import { ArrowLeft, FolderOpen } from "lucide-react"
+import { NuevoCasoModal } from "@/components/casos/NuevoCasoModal"
 import { OrdersTable } from "@/components/tickets/OrdersTable"
 import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
@@ -64,12 +64,12 @@ export default function TicketsList() {
           </div>
 
           <div className="flex items-center gap-3">
-            <TicketModal>
-              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-xs transition-colors">
-                <Plus className="w-4 h-4 mr-1.5" />
-                Nueva Orden
+            <NuevoCasoModal>
+              <Button className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" />
+                Aperturar Caso
               </Button>
-            </TicketModal>
+            </NuevoCasoModal>
             <div className="border-l border-slate-200 pl-3">
               <UserMenu />
             </div>
