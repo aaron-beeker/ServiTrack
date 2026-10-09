@@ -34,6 +34,34 @@ const COLECCION_ORDENES = 'ordenes_servicio';
 const ESTADOS_CERRADOS: EstadoCaso[] = ['CERRADO', 'CERRADO_SIN_REPARACION'];
 
 /**
+ * Sanitiza recursivamente cualquier objeto o array eliminando campos `undefined`
+ * para cumplir con la restricción estricta de Firestore (no soporta undefined).
+ */
+export const limpiarUndefined = <T>(obj: T): T => {
+  if (obj === undefined) {
+    return null as any;
+  }
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (obj instanceof Date) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => limpiarUndefined(item)) as any;
+  }
+  const limpio: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      limpio[key] = limpiarUndefined(value);
+    }
+  }
+  return limpio as T;
+};
+
+/**
  * Genera el siguiente código correlativo para CASO (CASO-XXXXXX)
  * utilizando una transacción atómica en Firestore.
  */
@@ -223,7 +251,7 @@ export const crearNuevoCaso = async (params: {
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await setDoc(docRef, nuevoCaso);
+  await setDoc(docRef, limpiarUndefined(nuevoCaso));
 
   return nuevoCaso;
 };
@@ -385,13 +413,13 @@ export const registrarNuevaIncidencia = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     incidencias: [...(caso.incidencias || []), nuevaInc],
     historial: [nuevaActividad, ...(caso.historial || [])],
     estado: nuevoEstado,
-    'garantia.reingresosContador': esGarantia ? (caso.garantia.reingresosContador || 0) + 1 : caso.garantia.reingresosContador,
+    'garantia.reingresosContador': esGarantia ? (caso.garantia.reingresosContador || 0) + 1 : (caso.garantia?.reingresosContador || 0),
     actualizadoEl: ahora
-  });
+  }));
 
   return nuevaInc;
 };
@@ -419,22 +447,24 @@ export const registrarAtencionSimple = async (
   const siguienteIndice = (caso.constancias?.length || 0) + 1;
   const constId = `CONST-${siguienteIndice.toString().padStart(3, '0')}`;
 
+  const idIncidenciaAsociada = params.incidenciaId || caso.incidencias?.find(i => i.estado !== 'RESUELTA')?.id || null;
+
   const nuevaConstancia: ConstanciaAtencionSimple = {
     id: constId,
     codigoConstancia: constId,
-    incidenciaId: params.incidenciaId,
     fecha: ahora,
     tecnicoResponsable: params.tecnicoResponsable,
     motivoSoporte: params.motivoSoporte.trim(),
     actividadesRealizadas: params.actividadesRealizadas.trim(),
     resultado: params.resultado.trim(),
     firmaReceptor: params.firmaReceptor || null,
-    creadoEl: ahora
+    creadoEl: ahora,
+    ...(idIncidenciaAsociada ? { incidenciaId: idIncidenciaAsociada } : {})
   };
 
   // Marcar incidencia como resuelta si aplica
   const incidenciasActualizadas = (caso.incidencias || []).map((inc) => {
-    if (!params.incidenciaId || inc.id === params.incidenciaId) {
+    if (!idIncidenciaAsociada || inc.id === idIncidenciaAsociada) {
       return { ...inc, estado: 'RESUELTA' as const };
     }
     return inc;
@@ -451,12 +481,12 @@ export const registrarAtencionSimple = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     constancias: [...(caso.constancias || []), nuevaConstancia],
     incidencias: incidenciasActualizadas,
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 
   return nuevaConstancia;
 };
@@ -487,10 +517,11 @@ export const registrarDiagnosticoTecnico = async (
   const siguienteIndice = (caso.diagnosticos?.length || 0) + 1;
   const dtId = `DT-${siguienteIndice.toString().padStart(3, '0')}`;
 
+  const idIncidenciaAsociada = params.incidenciaId || caso.incidencias?.find(i => i.estado !== 'RESUELTA')?.id || null;
+
   const nuevoDT: DiagnosticoTecnicoCaso = {
     id: dtId,
     codigoDT: dtId,
-    incidenciaId: params.incidenciaId,
     fecha: ahora,
     tecnicoResponsable: params.tecnicoResponsable,
     tipoFalla: params.tipoFalla,
@@ -504,7 +535,8 @@ export const registrarDiagnosticoTecnico = async (
     estado: 'CONCLUIDO',
     aprobacionCliente: null,
     informePdfUrl: null,
-    creadoEl: ahora
+    creadoEl: ahora,
+    ...(idIncidenciaAsociada ? { incidenciaId: idIncidenciaAsociada } : {})
   };
 
   const nuevaActividad: ActividadHistorial = {
@@ -518,12 +550,12 @@ export const registrarDiagnosticoTecnico = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     diagnosticos: [...(caso.diagnosticos || []), nuevoDT],
     estado: 'PENDIENTE_DE_APROBACION',
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 
   return nuevoDT;
 };
@@ -633,14 +665,14 @@ export const registrarDecisionPropuestaTecnica = async (
   }
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     diagnosticos: diagnosticosActualizados,
     ordenesServicio: ordenesActualizadas,
     estado: nuevoEstadoCaso,
     fechaCierre: aprobado ? null : ahora,
     historial: [...actividadesHistorial, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 
   return nuevaOS;
 };
@@ -682,8 +714,6 @@ export const generarOrdenServicioTrabajo = async (
   const nuevaOS: OrdenServicioTrabajo = {
     id: osId,
     codigoOS: osId,
-    incidenciaId: params.incidenciaId,
-    diagnosticoId: params.diagnosticoId,
     tipo: params.tipo,
     tecnicoAsignado: params.tecnicoAsignado,
     actividades: params.actividades.trim(),
@@ -691,7 +721,9 @@ export const generarOrdenServicioTrabajo = async (
     estado: 'EN_EJECUCION',
     fechaInicio: ahora,
     pruebasQA: null,
-    creadoEl: ahora
+    creadoEl: ahora,
+    ...(params.incidenciaId ? { incidenciaId: params.incidenciaId } : {}),
+    ...(params.diagnosticoId ? { diagnosticoId: params.diagnosticoId } : {})
   };
 
   const nuevaActividad: ActividadHistorial = {
@@ -705,12 +737,12 @@ export const generarOrdenServicioTrabajo = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     ordenesServicio: [...(caso.ordenesServicio || []), nuevaOS],
     estado: 'EN_REPARACION',
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 
   return nuevaOS;
 };
@@ -766,12 +798,12 @@ export const registrarPruebasQAyFinalizarOS = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     ordenesServicio: ordenesActualizadas,
     estado: params.superoQA ? 'ENTREGADO' : 'EN_PRUEBAS',
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 };
 
 /**
@@ -797,7 +829,7 @@ export const registrarEntregaYActivarGarantia = async (
   const dias = params.diasGarantia || 30;
 
   // Cálculo de vencimiento de garantía
-  let fechaVence: string | undefined = undefined;
+  let fechaVence: string | null = null;
   if (params.aplicaGarantia) {
     const vDate = new Date(ahora);
     vDate.setDate(vDate.getDate() + dias);
@@ -807,10 +839,10 @@ export const registrarEntregaYActivarGarantia = async (
   const nuevaGarantia: GarantiaCaso = {
     aplicaGarantia: params.aplicaGarantia,
     diasGarantia: dias,
-    fechaInicioGarantia: params.aplicaGarantia ? ahora : undefined,
-    fechaVencimientoGarantia: fechaVence,
     activa: params.aplicaGarantia,
-    reingresosContador: caso.garantia?.reingresosContador || 0
+    reingresosContador: caso.garantia?.reingresosContador || 0,
+    ...(params.aplicaGarantia ? { fechaInicioGarantia: ahora } : {}),
+    ...(fechaVence ? { fechaVencimientoGarantia: fechaVence } : {})
   };
 
   const nuevoEstado: EstadoCaso = params.aplicaGarantia ? 'EN_GARANTIA' : 'ENTREGADO';
@@ -827,12 +859,12 @@ export const registrarEntregaYActivarGarantia = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     estado: nuevoEstado,
     garantia: nuevaGarantia,
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 };
 
 /**
@@ -861,7 +893,7 @@ export const firmarLiquidacionYCerrarCaso = async (
   };
 
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
-  await updateDoc(docRef, {
+  await updateDoc(docRef, limpiarUndefined({
     estado: 'CERRADO',
     fechaCierre: ahora,
     'garantia.activa': false,
@@ -872,7 +904,7 @@ export const firmarLiquidacionYCerrarCaso = async (
     },
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
-  });
+  }));
 };
 
 /**
@@ -984,7 +1016,7 @@ export const sincronizarOrdenesExistentesACasos = async (): Promise<number> => {
         actualizadoEl: ord.actualizadoEl || ahora
       };
 
-      await setDoc(doc(db, COLECCION_CASOS, codigoCaso), nuevoCaso);
+      await setDoc(doc(db, COLECCION_CASOS, codigoCaso), limpiarUndefined(nuevoCaso));
       seriesConCaso.add(serie);
       migrados++;
     }
