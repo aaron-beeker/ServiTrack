@@ -34,6 +34,11 @@ export function CasoStateBadge({ estado, size = "md" }: CasoStateBadgeProps) {
       className: "bg-purple-50 text-purple-800 border-purple-300",
       dot: "bg-purple-500"
     },
+    REPARADO: {
+      label: "REPARADO / LISTO",
+      className: "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold",
+      dot: "bg-emerald-500"
+    },
     ENTREGADO: {
       label: "ENTREGADO",
       className: "bg-slate-100 text-slate-700 border-slate-300",
@@ -56,7 +61,18 @@ export function CasoStateBadge({ estado, size = "md" }: CasoStateBadgeProps) {
     }
   }
 
-  const current = config[estado] || {
+  const normalizarClave = (str: string) => {
+    if (!str) return ""
+    return str
+      .trim()
+      .replace(/ /g, "_")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+  }
+
+  const claveNormalizada = normalizarClave(estado)
+  const current = config[estado] || config[claveNormalizada] || {
     label: estado.replace(/_/g, " "),
     className: "bg-slate-100 text-slate-700 border-slate-200",
     dot: "bg-slate-400"

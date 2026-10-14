@@ -33,7 +33,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/context/AuthContext"
 import { getAllClientes, createCliente } from "@/services/clienteService"
 import { getAllModelos, createModelo } from "@/services/modeloService"
-import { verificarExpedienteActivoEquipo, crearNuevoCaso } from "@/services/casoService"
+import { verificarExpedienteActivoEquipo, crearNuevoCaso, registrarNuevaIncidencia } from "@/services/casoService"
 import { Caso, Cliente, ModeloEquipo, OrigenIncidencia, PrioridadIncidencia } from "@/types"
 
 interface NuevoCasoModalProps {
@@ -89,7 +89,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   // Formulario: Incidencia Inicial
   const [descripcionAveria, setDescripcionAveria] = useState("")
   const [prioridad, setPrioridad] = useState<PrioridadIncidencia>("MEDIA")
-  const [requiereAnalisisTecnico, setRequiereAnalisisTecnico] = useState(true)
+  const [requiereAnalisisTecnico, setRequiereAnalisisTecnico] = useState<boolean>(true)
 
   // Cliente Inline
   const [creandoCliente, setCreandoCliente] = useState(false)
@@ -259,6 +259,27 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
 
     setGuardando(true)
     try {
+      if (casoExistente) {
+        // ETAPA 0 DEL FLUJO: Si existe caso previo abierto o en garantía, RECUPERAR CASO EXISTENTE y registrar nueva INC
+        const esGarantia = Boolean(casoExistente.garantia?.activa) || origen === "RECLAMO_GARANTIA"
+        const nuevaInc = await registrarNuevaIncidencia(casoExistente.codigoCaso, {
+          descripcion: descripcionAveria,
+          prioridad,
+          reportadoPor: contacto || razonSocial,
+          origen: esGarantia ? "RECLAMO_GARANTIA" : origen,
+          requiereAnalisisTecnico,
+          esReingresoGarantia: esGarantia,
+          autor: `${operadorNombre} (${operadorCorreo})`
+        })
+
+        toast.success(`Incidencia ${nuevaInc.codigoINC} anexada al expediente único ${casoExistente.codigoCaso}.`)
+        setOpen(false)
+        if (onSuccess) onSuccess(casoExistente.codigoCaso)
+        router.push(`/casos/${casoExistente.codigoCaso}`)
+        return
+      }
+
+      // Si no existe caso previo activo: Apertura NUEVO CASO (CASO-XXXXXX)
       const nuevoCaso = await crearNuevoCaso({
         cliente: {
           razonSocial,
@@ -291,7 +312,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
       router.push(`/casos/${nuevoCaso.codigoCaso}`)
     } catch (err: any) {
       console.error(err)
-      toast.error(err.message || "Error al aperturar el caso.")
+      toast.error(err.message || "Error al procesar el caso.")
     } finally {
       setGuardando(false)
     }
@@ -573,7 +594,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                     <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                     <div className="flex-1 text-xs">
                       <p className="font-bold text-amber-900">
-                        ¡Expediente previo detectado para este activo: {casoExistente.codigoCaso}!
+                        ¡Expediente previo activo detectado: {casoExistente.codigoCaso}!
                       </p>
                       <p className="text-[11px] text-amber-800 mt-0.5">
                         Estado actual: <strong className="font-semibold">{casoExistente.estado}</strong>
@@ -583,8 +604,8 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                           </span>
                         )}
                       </p>
-                      <p className="text-[11px] text-amber-700 mt-1">
-                        Según la regla de trazabilidad única, se recomienda ingresar nuevas incidencias dentro del mismo expediente para conservar el historial técnico.
+                      <p className="text-[11px] text-amber-800 mt-1">
+                        <strong>Regla de Expediente Único (Etapa 0):</strong> Al enviar este formulario, el sistema no creará un caso nuevo; anexará automáticamente una nueva Incidencia (INC) a este expediente existente para preservar toda la trazabilidad histórica del equipo.
                       </p>
                     </div>
                   </div>
@@ -599,12 +620,9 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                       }}
                       className="bg-amber-800 hover:bg-amber-900 text-white text-xs h-7.5 px-3 rounded-lg font-semibold"
                     >
-                      Ir al CASO Existente ({casoExistente.codigoCaso})
+                      Ver Expediente Actual ({casoExistente.codigoCaso})
                       <ArrowRight className="w-3.5 h-3.5 ml-1" />
                     </Button>
-                    <span className="text-[10px] text-amber-700">
-                      O puedes continuar abajo si se requiere una atención independiente.
-                    </span>
                   </div>
                 </div>
               )}
@@ -820,7 +838,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
               </div>
             </div>
 
-            {/* SECCIÓN 3: Incidencia Inicial y Bifurcación de Ruta Técnica */}
+            {/* SECCIÓN 3: Incidencia Inicial */}
             <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
@@ -828,11 +846,11 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                     <FileText className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    3. Incidencia Inicial (INC-001) y Triage Técnico
+                    3. Avería o Falla Reportada al Ingreso
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-400 font-medium">
-                  Ruta Operativa Fase 2
+                  Incidencia Inicial (INC-001)
                 </span>
               </div>
 
@@ -845,7 +863,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                   value={descripcionAveria}
                   onChange={(e) => setDescripcionAveria(e.target.value)}
                   placeholder="Describe con precisión los síntomas reportados (ej. Equipo no enciende, pantalla parpadea, sobrecalentamiento...)"
-                  rows={2}
+                  rows={3}
                   className="w-full text-xs rounded-lg border border-slate-200 p-2.5 text-slate-800 focus:outline-none focus:border-[#2369A1] resize-none"
                   required
                 />
@@ -881,68 +899,65 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                 </div>
               </div>
 
-              {/* BIFURCACIÓN DE RUTA TÉCNICA (Fase 2) */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Ruta de Atención Técnica Requerida (Fase 2):
-                </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Tarjeta 2A */}
-                  <button
-                    type="button"
-                    onClick={() => setRequiereAnalisisTecnico(false)}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
-                      !requiereAnalisisTecnico
-                        ? "border-[#2369A1] bg-[#2369A1]/8 ring-1 ring-[#2369A1] text-slate-900 shadow-2xs"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#2369A1]" />
-                        <span className="font-bold text-xs text-slate-900">2A. Soporte Simple</span>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100/70 text-[#2369A1]">
-                        Constancia
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-2">
-                      Limpieza interna, lubricación, reinicio, pruebas rápidas o sustitución temporal.
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      • No genera Informe Técnico ni repuestos
-                    </p>
-                  </button>
+              {/* Bifurcación Clave de Negocio: ¿Requiere análisis técnico y descarte formal? */}
+              <div className="space-y-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-800">
+                    ¿Requiere análisis técnico y descarte formal en laboratorio? <span className="text-rose-500">*</span>
+                  </Label>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    Bifurcación del Flujo
+                  </span>
+                </div>
 
-                  {/* Tarjeta 2B */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setRequiereAnalisisTecnico(true)}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                    className={`p-3 rounded-xl border text-left transition-all ${
                       requiereAnalisisTecnico
-                        ? "border-amber-600 bg-amber-50/60 ring-1 ring-amber-600 text-slate-900 shadow-2xs"
+                        ? "border-[#2369A1] bg-[#2369A1]/5 ring-2 ring-[#2369A1] text-slate-900 shadow-2xs"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Wrench className="w-4 h-4 text-amber-600" />
-                        <span className="font-bold text-xs text-slate-900">2B. Diagnóstico (DT)</span>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <span className={`w-2.5 h-2.5 rounded-full ${requiereAnalisisTecnico ? "bg-[#2369A1]" : "bg-slate-300"}`} />
+                        SÍ — Requiere Análisis (Ruta 2.B)
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                        Informe Técnico
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-[#2369A1]">
+                        Laboratorio / DT
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 mt-2">
-                      Evaluación formal de causa raíz, descarte de componentes y propuesta de repuestos.
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Pasa a <strong>2.B Diagnóstico Técnico (DT)</strong>, cotización de repuestos, aprobación de cliente y taller (OS).
                     </p>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      • Requiere aprobación del cliente para pasar a taller
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRequiereAnalisisTecnico(false)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      !requiereAnalisisTecnico
+                        ? "border-teal-600 bg-teal-50/80 ring-2 ring-teal-600 text-slate-900 shadow-2xs"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <span className={`w-2.5 h-2.5 rounded-full ${!requiereAnalisisTecnico ? "bg-teal-600" : "bg-slate-300"}`} />
+                        NO — Atención Simple (Ruta 2.A)
+                      </div>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-100 text-teal-800">
+                        Soporte Menor
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Pasa únicamente a <strong>2.A Atención Simple</strong> (limpieza, config). Emite constancia y salta directo a <strong>4. Entrega y Cierre</strong>.
                     </p>
                   </button>
                 </div>
               </div>
-
             </div>
 
           </div>
@@ -967,17 +982,22 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                 type="submit"
                 size="sm"
                 disabled={guardando}
-                className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-4 shadow-xs"
+                className={casoExistente ? "bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold px-4 shadow-xs" : "bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold px-4 shadow-xs"}
               >
                 {guardando ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    Aperturando...
+                    Procesando...
+                  </>
+                ) : casoExistente ? (
+                  <>
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    Anexar Incidencia a {casoExistente.codigoCaso}
                   </>
                 ) : (
                   <>
                     <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
-                    Crear Expediente de Caso
+                    Aperturar Nuevo Expediente (Caso)
                   </>
                 )}
               </Button>

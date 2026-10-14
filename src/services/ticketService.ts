@@ -1,3 +1,8 @@
+/**
+ * @deprecated SERVICIO LEGADO DE TICKETS (PRE-MIGRACIÓN).
+ * Usar `casoService.ts` para todas las operaciones del ciclo de vida de Casos.
+ */
+
 import { 
   getOrdenServicioByCodigo, 
   getOrdenesServicio, 

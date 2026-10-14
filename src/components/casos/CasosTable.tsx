@@ -87,8 +87,8 @@ export function CasosTable({ onSelectCaso, filtroEstadoInicial = "TODOS" }: Caso
     if (filtroEstado === "TODOS") return true
     if (filtroEstado === "ABIERTO") return caso.estado === "ABIERTO"
     if (filtroEstado === "EN_DIAGNOSTICO") return caso.estado === "EN_DIAGNOSTICO" || caso.estado === "PENDIENTE_DE_APROBACION"
-    if (filtroEstado === "EN_REPARACION") return caso.estado === "EN_REPARACION" || caso.estado === "EN_PRUEBAS"
-    if (filtroEstado === "EN_GARANTIA") return caso.estado === "EN_GARANTIA" || caso.garantia?.activa
+    if (filtroEstado === "EN_REPARACION") return caso.estado === "EN_REPARACION" || caso.estado === "EN_PRUEBAS" || caso.estado === "REPARADO"
+    if (filtroEstado === "EN_GARANTIA") return caso.estado === "EN_GARANTIA" || Boolean(caso.garantia?.activa)
     if (filtroEstado === "ENTREGADO") return caso.estado === "ENTREGADO" || caso.estado === "CERRADO" || caso.estado === "CERRADO_SIN_REPARACION"
 
     return caso.estado === filtroEstado
@@ -119,15 +119,15 @@ export function CasosTable({ onSelectCaso, filtroEstadoInicial = "TODOS" }: Caso
           />
         </div>
 
-        {/* Pestañas de Filtrado */}
+        {/* Pestañas de Filtrado Alineadas a las 4 Etapas */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {[
             { id: "TODOS", label: "Todos", dot: "" },
-            { id: "ABIERTO", label: "Abiertos", dot: "bg-[#2369A1]" },
-            { id: "EN_DIAGNOSTICO", label: "En Diagnóstico", dot: "bg-amber-500" },
-            { id: "EN_REPARACION", label: "En Reparación", dot: "bg-violet-500" },
+            { id: "ABIERTO", label: "1. Ingreso", dot: "bg-[#2369A1]" },
+            { id: "EN_DIAGNOSTICO", label: "2. Diagnóstico", dot: "bg-amber-500" },
+            { id: "EN_REPARACION", label: "3. Taller & QA", dot: "bg-violet-500" },
             { id: "EN_GARANTIA", label: "En Garantía", dot: "bg-emerald-500" },
-            { id: "ENTREGADO", label: "Concluidos / Cerrados", dot: "bg-slate-400" }
+            { id: "ENTREGADO", label: "4. Entregado / Finalizado", dot: "bg-slate-400" }
           ].map(tab => (
             <button
               key={tab.id}

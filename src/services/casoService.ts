@@ -24,7 +24,8 @@ import {
   PrioridadIncidencia,
   TipoOrdenServicio,
   RepuestoItem,
-  OrdenServicio
+  OrdenServicio,
+  DatosIngresoCaso
 } from '@/types';
 
 const COLECCION_CASOS = 'casos';
@@ -253,7 +254,81 @@ export const crearNuevoCaso = async (params: {
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
   await setDoc(docRef, limpiarUndefined(nuevoCaso));
 
+  // Subcolección estricta: casos/{codigoCaso}/incidencias/{incId}
+  try {
+    const incSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/incidencias`, incId);
+    await setDoc(incSubRef, limpiarUndefined(incidencia));
+  } catch (err) {
+    console.warn('Error al guardar subcolección incidencia:', err);
+  }
+
   return nuevoCaso;
+};
+
+/**
+ * ETAPA 0 Y 1 (Diagrama de Flujo Oficial):
+ * Verifica si el N° de Serie tiene un expediente abierto o con garantía activa:
+ * - Si existe: Recupera el CASO existente y registra una nueva INC (marcando garantía si aplica).
+ * - Si no existe: Crea un NUEVO CASO (CASO-XXXXXX) y su primera incidencia (INC-001).
+ */
+export const procesarIngresoEquipo = async (datos: DatosIngresoCaso) => {
+  const casoExistente = await verificarExpedienteActivoEquipo(datos.activo.numeroSerie);
+
+  if (casoExistente) {
+    const enPlazoGarantia = Boolean(casoExistente.garantia?.activa) || 
+      datos.incidenciaInicial.origen === 'RECLAMO_GARANTIA' || 
+      datos.incidenciaInicial.origen === 'Reclamo de Garantía';
+
+    const nuevaInc = await registrarNuevaIncidencia(casoExistente.codigoCaso, {
+      descripcion: datos.incidenciaInicial.averiaReportada,
+      prioridad: datos.incidenciaInicial.prioridad,
+      reportadoPor: datos.cliente.contacto || datos.cliente.razonSocial,
+      origen: enPlazoGarantia ? 'RECLAMO_GARANTIA' : datos.incidenciaInicial.origen,
+      requiereAnalisisTecnico: datos.incidenciaInicial.requiereAnalisisTecnico,
+      esReingresoGarantia: enPlazoGarantia,
+      autor: datos.responsableApertura || 'Mesa de Recepción'
+    });
+
+    return {
+      modo: 'CASO_RECUPERADO' as const,
+      idCaso: casoExistente.codigoCaso,
+      codigoIncidencia: nuevaInc.codigoINC,
+      enPlazoGarantia
+    };
+  }
+
+  const nuevoCaso = await crearNuevoCaso({
+    cliente: {
+      razonSocial: datos.cliente.razonSocial,
+      ruc: datos.cliente.ruc,
+      contacto: datos.cliente.contacto,
+      telefono: datos.cliente.telefono || '',
+      correo: datos.cliente.correo || ''
+    },
+    equipo: {
+      tipoEquipo: datos.activo.tipoEquipo || datos.activo.equipo || 'Laptop',
+      marca: datos.activo.marca,
+      modelo: datos.activo.modelo,
+      numeroSerie: datos.activo.numeroSerie.trim().toUpperCase(),
+      partNumber: datos.activo.partNumber || ''
+    },
+    origen: datos.incidenciaInicial.origen,
+    contratoAlquiler: datos.contratoAlquiler.aplicaContrato ? (datos.contratoAlquiler.idContrato || undefined) : undefined,
+    responsableApertura: datos.responsableApertura || 'Mesa de Recepción',
+    incidenciaInicial: {
+      descripcion: datos.incidenciaInicial.averiaReportada,
+      prioridad: datos.incidenciaInicial.prioridad,
+      reportadoPor: datos.cliente.contacto || datos.cliente.razonSocial,
+      requiereAnalisisTecnico: datos.incidenciaInicial.requiereAnalisisTecnico
+    }
+  });
+
+  return {
+    modo: 'NUEVO_CASO' as const,
+    idCaso: nuevoCaso.codigoCaso,
+    codigoIncidencia: 'INC-001',
+    enPlazoGarantia: false
+  };
 };
 
 /**
@@ -275,6 +350,14 @@ export const getCasoByCodigo = async (codigoCaso: string): Promise<Caso | null> 
   for (const d of allSnaps.docs) {
     const data = d.data() as Caso;
     if (d.id === codigoCaso || data.codigoCaso === codigoCaso) {
+      return { ...data, id: d.id, codigoCaso: data.codigoCaso || d.id };
+    }
+    // Búsqueda por código de Diagnóstico DT asociado
+    if (data.diagnosticos?.some(dt => dt.codigoDT === codigoCaso)) {
+      return { ...data, id: d.id, codigoCaso: data.codigoCaso || d.id };
+    }
+    // Búsqueda por código de Orden de Servicio OS asociada
+    if (data.ordenesServicio?.some(os => os.codigoOS === codigoCaso)) {
       return { ...data, id: d.id, codigoCaso: data.codigoCaso || d.id };
     }
   }
@@ -421,6 +504,14 @@ export const registrarNuevaIncidencia = async (
     actualizadoEl: ahora
   }));
 
+  // Sincronización en subcolección casos/{caso}/incidencias
+  try {
+    const incSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/incidencias`, nuevaInc.id);
+    await setDoc(incSubRef, limpiarUndefined(nuevaInc));
+  } catch (err) {
+    console.warn('Subcolección incidencias:', err);
+  }
+
   return nuevaInc;
 };
 
@@ -433,9 +524,10 @@ export const registrarAtencionSimple = async (
   codigoCaso: string,
   params: {
     incidenciaId?: string;
-    motivoSoporte: string;
+    motivoSoporte?: string;
     actividadesRealizadas: string;
     resultado: string;
+    ticketItop?: string;
     tecnicoResponsable: string;
     firmaReceptor?: string;
   }
@@ -449,14 +541,21 @@ export const registrarAtencionSimple = async (
 
   const idIncidenciaAsociada = params.incidenciaId || caso.incidencias?.find(i => i.estado !== 'RESUELTA')?.id || null;
 
+  const motivoFinal = params.motivoSoporte?.trim()
+    || caso.incidencias?.find(i => i.id === idIncidenciaAsociada)?.descripcion
+    || caso.incidencias?.[caso.incidencias.length - 1]?.descripcion
+    || caso.incidencias?.[0]?.descripcion
+    || 'Soporte menor / mantenimiento preventivo';
+
   const nuevaConstancia: ConstanciaAtencionSimple = {
     id: constId,
     codigoConstancia: constId,
     fecha: ahora,
     tecnicoResponsable: params.tecnicoResponsable,
-    motivoSoporte: params.motivoSoporte.trim(),
+    motivoSoporte: motivoFinal,
     actividadesRealizadas: params.actividadesRealizadas.trim(),
     resultado: params.resultado.trim(),
+    ticketItop: params.ticketItop?.trim() || null,
     firmaReceptor: params.firmaReceptor || null,
     creadoEl: ahora,
     ...(idIncidenciaAsociada ? { incidenciaId: idIncidenciaAsociada } : {})
@@ -476,7 +575,7 @@ export const registrarAtencionSimple = async (
     autor: params.tecnicoResponsable,
     tipo: 'ATENCION_SIMPLE',
     titulo: `Constancia de Atención ${constId}`,
-    detalle: `Soporte menor ejecutado: ${params.motivoSoporte}. Resultado: ${params.resultado}. No requiere informe técnico.`,
+    detalle: `Soporte menor: ${motivoFinal}. Resultado: ${params.resultado}${params.ticketItop ? ` • Ticket iTop: ${params.ticketItop}` : ''}. No requiere informe técnico.`,
     referenciaId: constId
   };
 
@@ -485,8 +584,17 @@ export const registrarAtencionSimple = async (
     constancias: [...(caso.constancias || []), nuevaConstancia],
     incidencias: incidenciasActualizadas,
     historial: [nuevaActividad, ...(caso.historial || [])],
+    estado: 'REPARADO',
     actualizadoEl: ahora
   }));
+
+  // Sincronización en subcolección casos/{caso}/constancias
+  try {
+    const constSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/constancias`, nuevaConstancia.id);
+    await setDoc(constSubRef, limpiarUndefined(nuevaConstancia));
+  } catch (err) {
+    console.warn('Subcolección constancias:', err);
+  }
 
   return nuevaConstancia;
 };
@@ -552,10 +660,18 @@ export const registrarDiagnosticoTecnico = async (
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
   await updateDoc(docRef, limpiarUndefined({
     diagnosticos: [...(caso.diagnosticos || []), nuevoDT],
-    estado: 'PENDIENTE_DE_APROBACION',
+    estado: 'EN_DIAGNOSTICO',
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
   }));
+
+  // Sincronización en subcolección casos/{caso}/diagnosticos
+  try {
+    const dtSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/diagnosticos`, nuevoDT.id);
+    await setDoc(dtSubRef, limpiarUndefined(nuevoDT));
+  } catch (err) {
+    console.warn('Subcolección diagnosticos:', err);
+  }
 
   return nuevoDT;
 };
@@ -674,6 +790,16 @@ export const registrarDecisionPropuestaTecnica = async (
     actualizadoEl: ahora
   }));
 
+  // Sincronización en subcolección de OS si se generó inmediatamente
+  if (nuevaOS) {
+    try {
+      const osSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/ordenes_servicio`, (nuevaOS as any).id);
+      await setDoc(osSubRef, limpiarUndefined(nuevaOS));
+    } catch (err) {
+      console.warn('Subcolección ordenes_servicio:', err);
+    }
+  }
+
   return nuevaOS;
 };
 
@@ -744,6 +870,14 @@ export const generarOrdenServicioTrabajo = async (
     actualizadoEl: ahora
   }));
 
+  // Sincronización en subcolección casos/{caso}/ordenes_servicio
+  try {
+    const osSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/ordenes_servicio`, nuevaOS.id);
+    await setDoc(osSubRef, limpiarUndefined(nuevaOS));
+  } catch (err) {
+    console.warn('Subcolección ordenes_servicio:', err);
+  }
+
   return nuevaOS;
 };
 
@@ -777,7 +911,8 @@ export const registrarPruebasQAyFinalizarOS = async (
         pruebasQA: {
           superoQA: params.superoQA,
           observacionesQA: params.observacionesQA || 'Pruebas operativas concluidas satisfactoriamente.',
-          fechaPruebas: ahora
+          fechaPruebas: ahora,
+          tecnicoQA: params.tecnico
         },
         firmaDigitalTecnico: params.firmaDigitalTecnico || null
       };
@@ -800,10 +935,29 @@ export const registrarPruebasQAyFinalizarOS = async (
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
   await updateDoc(docRef, limpiarUndefined({
     ordenesServicio: ordenesActualizadas,
-    estado: params.superoQA ? 'ENTREGADO' : 'EN_PRUEBAS',
+    estado: params.superoQA ? 'REPARADO' : 'EN_PRUEBAS',
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
   }));
+
+  // Sincronización en subcolección casos/{caso}/ordenes_servicio
+  try {
+    const osSubRef = doc(db, `${COLECCION_CASOS}/${codigoCaso}/ordenes_servicio`, osId);
+    await updateDoc(osSubRef, limpiarUndefined({
+      horasHombre: params.horasHombreReales !== undefined ? params.horasHombreReales : 1,
+      estado: (params.superoQA ? 'FINALIZADA' : 'EN_PRUEBAS') as any,
+      fechaFin: ahora,
+      pruebasQA: {
+        superoQA: params.superoQA,
+        observacionesQA: params.observacionesQA || 'Pruebas operativas concluidas satisfactoriamente.',
+        fechaPruebas: ahora,
+        tecnicoQA: params.tecnico
+      },
+      firmaDigitalTecnico: params.firmaDigitalTecnico || null
+    }));
+  } catch (err) {
+    console.warn('Subcolección ordenes_servicio QA:', err);
+  }
 };
 
 /**
@@ -858,9 +1012,18 @@ export const registrarEntregaYActivarGarantia = async (
     detalle: `Receptor: ${params.receptorNombre} (DNI/RUC: ${params.receptorDniRuc}). ${params.observaciones}${fechaVence ? `. Garantía vigente hasta ${new Date(fechaVence).toLocaleDateString('es-PE')}` : ''}`
   };
 
+  const nuevaEntrega = {
+    fechaEntrega: ahora,
+    receptorNombre: params.receptorNombre.trim(),
+    receptorDniRuc: params.receptorDniRuc?.trim() || '',
+    observaciones: params.observaciones?.trim() || '',
+    responsableEntrega: params.responsableEntrega
+  };
+
   const docRef = doc(db, COLECCION_CASOS, codigoCaso);
   await updateDoc(docRef, limpiarUndefined({
     estado: nuevoEstado,
+    entrega: nuevaEntrega,
     garantia: nuevaGarantia,
     historial: [nuevaActividad, ...(caso.historial || [])],
     actualizadoEl: ahora
@@ -1027,3 +1190,12 @@ export const sincronizarOrdenesExistentesACasos = async (): Promise<number> => {
     return 0;
   }
 };
+
+// ============================================================================
+// ALIASES CANÓNICOS (Conforme a la especificación del flujo de negocio)
+// ============================================================================
+export const emitirDiagnosticoTecnico = registrarDiagnosticoTecnico;
+export const procesarDecisionPropuesta = registrarDecisionPropuestaTecnica;
+export const generarOrdenServicio = generarOrdenServicioTrabajo;
+export const registrarEntregaEquipo = registrarEntregaYActivarGarantia;
+

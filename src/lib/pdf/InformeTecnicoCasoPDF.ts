@@ -138,10 +138,15 @@ export const generarInformeTecnicoCasoPDF = (caso: Caso, dt: DiagnosticoTecnicoC
 
   doc.line(125, firmasY, 185, firmasY);
   doc.setFont('helvetica', 'bold');
-  doc.text('AUTORIZACIÓN CLIENTE', 155, firmasY + 4, { align: 'center' });
+  const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
+  const tituloFirma = esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE';
+  doc.text(tituloFirma, 155, firmasY + 4, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(caso.cliente.contacto || caso.cliente.razonSocial, 155, firmasY + 8, { align: 'center' });
-  doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  const nombreFirma = caso.cliente.contacto || caso.cliente.razonSocial;
+  doc.text(nombreFirma, 155, firmasY + 8, { align: 'center' });
+  if (!esAlquiler && caso.cliente.ruc) {
+    doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  }
 
   doc.save(`InformeTecnico_${dt.codigoDT}_${caso.codigoCaso}.pdf`);
 };

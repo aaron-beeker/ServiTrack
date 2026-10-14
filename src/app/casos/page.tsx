@@ -30,21 +30,10 @@ export default function CasosPage() {
             <nav className="hidden md:flex items-center gap-1 border-l border-slate-200 pl-6">
               <button 
                 onClick={() => router.push('/')} 
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold text-[#2369A1] bg-[#2369A1]/8 rounded-md flex items-center gap-1.5"
               >
-                Panel de Control
-              </button>
-              <button 
-                onClick={() => router.push('/casos')} 
-                className="px-3 py-1.5 text-xs font-semibold text-[#2369A1] bg-[#2369A1]/8 rounded-md"
-              >
-                Expedientes (Casos)
-              </button>
-              <button 
-                onClick={() => router.push('/tickets')} 
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                Órdenes de Servicio
+                <FolderOpen className="w-3.5 h-3.5 text-[#2369A1]" />
+                Expedientes Técnicos (Casos)
               </button>
               <button 
                 onClick={() => router.push('/clientes')} 

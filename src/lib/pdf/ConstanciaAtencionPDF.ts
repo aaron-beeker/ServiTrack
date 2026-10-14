@@ -48,8 +48,13 @@ export const generarConstanciaAtencionPDF = (caso: Caso, constancia: ConstanciaA
   doc.setTextColor(...textColor);
   doc.setFont('helvetica', 'normal');
   doc.text(`Expediente: ${caso.codigoCaso}`, 112, 28);
+  let headerY = 32;
   if (caso.contratoAlquiler) {
-    doc.text(`Contrato: ${caso.contratoAlquiler}`, 112, 32);
+    doc.text(`Contrato: ${caso.contratoAlquiler}`, 112, headerY);
+    headerY += 4;
+  }
+  if (constancia.ticketItop) {
+    doc.text(`Ticket iTop: ${constancia.ticketItop}`, 112, headerY);
   }
 
   const safeFormatDate = (val: string | null | undefined) => {
@@ -63,7 +68,7 @@ export const generarConstanciaAtencionPDF = (caso: Caso, constancia: ConstanciaA
 
   // 2. Tabla Datos de Cliente y Activo
   autoTable(doc, {
-    startY: 37,
+    startY: 38,
     theme: 'grid',
     headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
     head: [['DATOS DEL CLIENTE', 'INFORMACIÓN DEL ACTIVO / EQUIPO']],
@@ -83,7 +88,8 @@ export const generarConstanciaAtencionPDF = (caso: Caso, constancia: ConstanciaA
     headStyles: { fillColor: headerColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
     head: [['CONCEPTO / EVALUACIÓN', 'DETALLE REGISTRADO EN ATENCIÓN']],
     body: [
-      ['Motivo de Atención', constancia.motivoSoporte],
+      ['Motivo de Atención (Falla)', constancia.motivoSoporte],
+      ...(constancia.ticketItop ? [['Ticket iTop Asistido', constancia.ticketItop]] : []),
       ['Actividades Ejecutadas', constancia.actividadesRealizadas],
       ['Resultado Técnico', constancia.resultado],
       ['Técnico Responsable', constancia.tecnicoResponsable],
@@ -120,13 +126,18 @@ export const generarConstanciaAtencionPDF = (caso: Caso, constancia: ConstanciaA
   doc.text(constancia.tecnicoResponsable, 55, firmasY + 8, { align: 'center' });
   doc.text('MUR Tecnología S.A.C.', 55, firmasY + 12, { align: 'center' });
 
-  // Firma Cliente / Receptor
+  // Firma Cliente / Receptor / Usuario
   doc.line(125, firmasY, 185, firmasY);
   doc.setFont('helvetica', 'bold');
-  doc.text('CONFORMIDAD CLIENTE', 155, firmasY + 4, { align: 'center' });
+  const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
+  const tituloFirma = esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE';
+  doc.text(tituloFirma, 155, firmasY + 4, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(caso.cliente.contacto || caso.cliente.razonSocial, 155, firmasY + 8, { align: 'center' });
-  doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  const nombreFirma = caso.cliente.contacto || caso.cliente.razonSocial;
+  doc.text(nombreFirma, 155, firmasY + 8, { align: 'center' });
+  if (!esAlquiler && caso.cliente.ruc) {
+    doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  }
 
   // Guardar / Descargar PDF
   doc.save(`Constancia_${constancia.codigoConstancia}_${caso.equipo.numeroSerie}.pdf`);

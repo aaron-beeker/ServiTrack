@@ -1,3 +1,14 @@
+/**
+ * @deprecated SERVICIO LEGADO DE ÓRDENES DE SERVICIO SUELTAS (PRE-MIGRACIÓN).
+ * 
+ * NOTA DE ARQUITECTURA:
+ * El nuevo flujo de 4 etapas lineales del sistema se gestiona de forma centralizada 
+ * y unificada a través de `casoService.ts` sobre la colección 'casos' (CASO-XXXXXX):
+ *   1. Ingreso & Incidencia -> 2. Diagnóstico Técnico -> 3. Intervención OS & QA -> 4. Entrega e Informe Técnico Final.
+ * 
+ * Este archivo se mantiene únicamente por compatibilidad con registros históricos de la colección 'ordenes_servicio'.
+ */
+
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {

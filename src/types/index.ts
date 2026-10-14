@@ -41,6 +41,9 @@ export interface IngresoOrden {
   cliente: ClienteOrden;
   equipo: EquipoOrden;
   fallaReportada: string;
+  origen?: OrigenIncidencia;
+  contratoAlquiler?: string;
+  esAlquiler?: boolean;
 }
 
 export interface DiagnosticoOrden {
@@ -96,6 +99,9 @@ export interface OrdenServicio {
   aprobacion?: AprobacionCliente | null;
   intervencion: IntervencionOrden;
   cierre: CierreOrden;
+  origen?: OrigenIncidencia;
+  contratoAlquiler?: string;
+  esAlquiler?: boolean;
 }
 
 // Catálogo maestro: repuestos
@@ -153,21 +159,43 @@ export interface ModeloEquipo {
 // ============================================================================
 
 export type EstadoCaso = 
-  | 'ABIERTO'                   // Caso aperturado con incidencia registrada
-  | 'EN_DIAGNOSTICO'           // En evaluación técnica formal (DT)
-  | 'PENDIENTE_DE_APROBACION'  // DT concluido, esperando aprobación de cliente o jefatura
-  | 'EN_REPARACION'            // OS en ejecución técnica
-  | 'EN_PRUEBAS'               // QA y pruebas de calidad
-  | 'ENTREGADO'                // Equipo entregado al cliente
-  | 'EN_GARANTIA'              // Plazo de garantía activo
-  | 'CERRADO'                  // Liquidación técnica final y cierre definitivo
-  | 'CERRADO_SIN_REPARACION';  // Rechazo de cotización o devolución sin reparación
+  | 'ABIERTO'
+  | 'EN DIAGNÓSTICO'
+  | 'EN_DIAGNOSTICO'
+  | 'CERRADO SIN REPARACIÓN'
+  | 'CERRADO_SIN_REPARACION'
+  | 'PENDIENTE DE APROBACIÓN'
+  | 'PENDIENTE_DE_APROBACION'
+  | 'EN REPARACIÓN'
+  | 'EN_REPARACION'
+  | 'EN PRUEBAS'
+  | 'EN_PRUEBAS'
+  | 'REPARADO'
+  | 'ENTREGADO'
+  | 'EN GARANTÍA'
+  | 'EN_GARANTIA'
+  | 'CERRADO';
 
-export type OrigenIncidencia = 'TALLER' | 'ALQUILER' | 'RECLAMO_GARANTIA';
-export type PrioridadIncidencia = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
-export type TipoOrdenServicio = 'CORRECTIVA' | 'PREVENTIVA' | 'GARANTIA' | 'INSTALACION' | 'MANTENIMIENTO' | 'INSPECCION';
+export type OrigenIncidencia = 'TALLER' | 'ALQUILER' | 'RECLAMO_GARANTIA' | 'Alquiler' | 'Taller' | 'Reclamo de Garantía';
+export type PrioridadIncidencia = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA' | 'Baja' | 'Media' | 'Alta' | 'Crítica';
+export type CondicionGarantia = 'ORDINARIA' | 'BAJO_CONTRATO' | 'APLICA GARANTIA';
+export type TipoOS = 'Correctiva' | 'Preventiva' | 'Garantía' | 'Instalación' | 'Inspección';
+export type TipoOrdenServicio = 'CORRECTIVA' | 'PREVENTIVA' | 'GARANTIA' | 'INSTALACION' | 'MANTENIMIENTO' | 'INSPECCION' | TipoOS;
 export type EstadoOrdenServicio = 'PENDIENTE' | 'ASIGNADA' | 'EN_EJECUCION' | 'EN_PRUEBAS' | 'FINALIZADA';
 export type EstadoDiagnostico = 'BORRADOR' | 'EN_EVALUACION' | 'CONCLUIDO' | 'APROBADO' | 'RECHAZADO';
+
+export interface DatosIngresoCaso {
+  cliente: { idCliente?: string; razonSocial: string; ruc: string; contacto: string; telefono?: string; correo?: string };
+  activo: { numeroSerie: string; equipo?: string; tipoEquipo?: string; marca: string; modelo: string; partNumber?: string };
+  contratoAlquiler: { aplicaContrato: boolean; idContrato?: string | null };
+  incidenciaInicial: {
+    origen: OrigenIncidencia;
+    prioridad: PrioridadIncidencia;
+    averiaReportada: string;
+    requiereAnalisisTecnico: boolean;
+  };
+  responsableApertura?: string;
+}
 
 export interface IncidenciaCaso {
   id: string; // e.g. "INC-001"
@@ -226,6 +254,7 @@ export interface OrdenServicioTrabajo {
     superoQA: boolean;
     observacionesQA?: string;
     fechaPruebas?: string;
+    tecnicoQA?: string;
   } | null;
   firmaDigitalTecnico?: string | null;
   creadoEl: string;
@@ -237,9 +266,10 @@ export interface ConstanciaAtencionSimple {
   incidenciaId?: string;
   fecha: string;
   tecnicoResponsable: string;
-  motivoSoporte: string; // Limpieza, Configuración, Reinicio, Sustitución temporal, Soporte menor
+  motivoSoporte: string; // Proveniente de la falla reportada de la incidencia inicial
   actividadesRealizadas: string;
   resultado: string;
+  ticketItop?: string | null; // Ticket de iTop al cual se dio asistencia
   firmaReceptor?: string | null;
   creadoEl: string;
 }
@@ -293,6 +323,15 @@ export interface Caso {
   constancias: ConstanciaAtencionSimple[];
   garantia: GarantiaCaso;
   historial: ActividadHistorial[];
+
+  // Datos de entrega técnica e Informe Final
+  entrega?: {
+    fechaEntrega: string;
+    receptorNombre: string;
+    receptorDniRuc?: string;
+    observaciones?: string;
+    responsableEntrega?: string;
+  } | null;
 
   // Liquidación final
   liquidacionFinal?: {
