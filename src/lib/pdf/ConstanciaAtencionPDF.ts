@@ -1,144 +1,148 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
 import { Caso, ConstanciaAtencionSimple } from '@/types';
+import {
+  createMurPdfDoc,
+  distributeElasticHeight,
+  drawClientAndDatesBox,
+  drawConsideracionesBox,
+  drawEquipmentBox,
+  drawMeasuredSection,
+  drawMurFooterAllPages,
+  drawMurHeader,
+  drawSignatureBoxes,
+  formatDateMur,
+  formatTimeMur,
+  KeyValueRow,
+  LabeledSectionSpec,
+  measureConsideracionesHeight,
+  measureLabeledSections,
+  MUR_LAYOUT,
+  MurHeaderOptions,
+} from './pdfTheme';
 
-interface jsPDFWithAutoTable extends jsPDF {
-  lastAutoTable: {
-    finalY: number;
-  };
-}
+const CONSIDERACIONES_CONSTANCIA =
+  'La presente constancia deja registro de la atención técnica realizada en relación con la incidencia reportada. Durante la atención se ejecutaron las labores de verificación, descarte y validación funcional del activo conforme al alcance solicitado. El usuario o representante del cliente suscribe la atención efectuada, así como las observaciones o recomendaciones indicadas por el especialista técnico. Cualquier consulta posterior deberá canalizarse mediante la mesa de ayuda de MUR Tecnología S.A.C.';
 
 /**
- * Generación de CONSTANCIA DE ATENCIÓN (Ruta 2A - Soporte Simple)
- * Acredita soporte técnico menor o preventivo (reinicio, configuración, limpieza, soporte simple)
- * sin requerir diagnóstico formal ni cotización de repuestos.
+ * Generación de CONSTANCIA DE ATENCIÓN (Ruta 2A - Soporte Simple / Alquiler / Taller)
+ * Identidad corporativa minimalista MUR Tecnología S.A.C. con tipografía Calibri.
  */
-export const generarConstanciaAtencionPDF = (caso: Caso, constancia: ConstanciaAtencionSimple) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable;
+export const generarConstanciaAtencionPDF = async (
+  caso: Caso,
+  constancia: ConstanciaAtencionSimple,
+  options?: { skipSave?: boolean }
+): Promise<jsPDF> => {
+  const { doc, fontFamily } = await createMurPdfDoc();
 
-  const primaryColor: [number, number, number] = [35, 105, 161]; // #2369A1 Azul MUR
-  const headerColor: [number, number, number] = [15, 23, 42]; // Slate 900
-  const textColor: [number, number, number] = [51, 65, 85]; // Slate 700
+  const codigoCaso =
+    (caso.codigoCaso && caso.codigoCaso !== 'undefined' ? caso.codigoCaso : caso.id) ||
+    'CASO-000001';
+  const incAsociada =
+    (constancia.incidenciaId
+      ? caso.incidencias?.find((i) => i.id === constancia.incidenciaId)
+      : undefined) || caso.incidencias?.[0];
+  const codigoInc = incAsociada?.codigoINC || constancia.incidenciaId || 'INC-001';
 
-  // 1. Cabecera Corporativa
-  doc.setFontSize(18);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('MUR TECNOLOGIA S.A.C.', 14, 18);
-
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text('RUC: 20603786301  |  Soporte de Hardware y Sistemas', 14, 23);
-  doc.text('Av. Alfredo Benavides 3082, Of. 503, Miraflores - Lima', 14, 27);
-  doc.text('Tel: (01) 640-9200  |  soporte@murtecnologia.com', 14, 31);
-
-  // Recuadro de Título de la Constancia
-  doc.setFontSize(13);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`CONSTANCIA DE ATENCIÓN TÉCNICA`, 112, 18);
-
-  doc.setFontSize(10);
-  doc.setTextColor(220, 38, 38);
-  doc.text(`N° ${constancia.codigoConstancia}`, 112, 23);
-
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Expediente: ${caso.codigoCaso}`, 112, 28);
-  let headerY = 32;
-  if (caso.contratoAlquiler) {
-    doc.text(`Contrato: ${caso.contratoAlquiler}`, 112, headerY);
-    headerY += 4;
-  }
-  if (constancia.ticketItop) {
-    doc.text(`Ticket iTop: ${constancia.ticketItop}`, 112, headerY);
+  const metaParts = [`Expediente: ${codigoCaso}`, `Incidencia: ${codigoInc}`];
+  if (caso.contratoAlquiler?.trim()) {
+    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
   }
 
-  const safeFormatDate = (val: string | null | undefined) => {
-    if (!val) return 'N/A';
-    try {
-      return format(new Date(val), 'dd/MM/yyyy HH:mm');
-    } catch {
-      return String(val);
-    }
+  const headerOpts: MurHeaderOptions = {
+    titulo: 'CONSTANCIA DE ATENCIÓN',
+    codigo: constancia.codigoConstancia,
+    subtituloMeta: metaParts.join('  ·  '),
   };
 
-  // 2. Tabla Datos de Cliente y Activo
-  autoTable(doc, {
-    startY: 38,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
-    head: [['DATOS DEL CLIENTE', 'INFORMACIÓN DEL ACTIVO / EQUIPO']],
-    body: [
-      [
-        `Razón Social: ${caso.cliente.razonSocial}\nRUC: ${caso.cliente.ruc}\nContacto: ${caso.cliente.contacto || 'N/A'}\nTeléfono: ${caso.cliente.telefono || 'N/A'}`,
-        `Equipo: ${caso.equipo.tipoEquipo}\nMarca / Modelo: ${caso.equipo.marca} ${caso.equipo.modelo}\nNúmero de Serie: ${caso.equipo.numeroSerie}\nFecha Atención: ${safeFormatDate(constancia.fecha)}`
-      ]
-    ],
-    styles: { fontSize: 8.5, cellPadding: 3, textColor: textColor }
-  });
+  let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
-  // 3. Tabla Detalle de la Atención Simple
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 5,
-    theme: 'grid',
-    headStyles: { fillColor: headerColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
-    head: [['CONCEPTO / EVALUACIÓN', 'DETALLE REGISTRADO EN ATENCIÓN']],
-    body: [
-      ['Motivo de Atención (Falla)', constancia.motivoSoporte],
-      ...(constancia.ticketItop ? [['Ticket iTop Asistido', constancia.ticketItop]] : []),
-      ['Actividades Ejecutadas', constancia.actividadesRealizadas],
-      ['Resultado Técnico', constancia.resultado],
-      ['Técnico Responsable', constancia.tecnicoResponsable],
-      ['Tipificación', 'SOPORTE MENOR / ATENCIÓN INMEDIATA (Sin requerimiento de repuestos)']
-    ],
-    styles: { fontSize: 8.5, cellPadding: 3, textColor: textColor },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 55 }
-    }
-  });
+  const fechaIngresoRaw = incAsociada?.fecha || caso.fechaApertura || constancia.fecha;
+  const fechaSalidaRaw = constancia.fecha || new Date().toISOString();
 
-  // 4. Cláusula de Conformidad
-  const posY = doc.lastAutoTable.finalY + 8;
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text(
-    'La presente constancia acredita la intervención técnica inmediata o preventiva descrita precedentemente, dejando constancia de la operatividad del activo.',
-    14,
-    posY,
-    { maxWidth: 180 }
-  );
+  const fIn = formatDateMur(fechaIngresoRaw);
+  const hIn = formatTimeMur(fechaIngresoRaw);
+  const fOut = formatDateMur(fechaSalidaRaw);
+  const hOut = formatTimeMur(fechaSalidaRaw);
 
-  // 5. Bloques de Firmas
-  const firmasY = posY + 32;
-
-  // Firma Técnico
-  doc.setDrawColor(148, 163, 184);
-  doc.line(25, firmasY, 85, firmasY);
-  doc.setFontSize(8.5);
-  doc.setTextColor(...headerColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TÉCNICO EJECUTOR', 55, firmasY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.text(constancia.tecnicoResponsable, 55, firmasY + 8, { align: 'center' });
-  doc.text('MUR Tecnología S.A.C.', 55, firmasY + 12, { align: 'center' });
-
-  // Firma Cliente / Receptor / Usuario
-  doc.line(125, firmasY, 185, firmasY);
-  doc.setFont('helvetica', 'bold');
-  const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
-  const tituloFirma = esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE';
-  doc.text(tituloFirma, 155, firmasY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  const nombreFirma = caso.cliente.contacto || caso.cliente.razonSocial;
-  doc.text(nombreFirma, 155, firmasY + 8, { align: 'center' });
-  if (!esAlquiler && caso.cliente.ruc) {
-    doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  const rightRows: KeyValueRow[] = [
+    { label: 'EXPEDIENTE:', value: `${codigoCaso} (${codigoInc})` },
+    { label: 'FECHA DE INGRESO:', value: hIn ? `${fIn} (${hIn})` : fIn },
+    { label: 'FECHA DE SALIDA:', value: hOut ? `${fOut} (${hOut})` : fOut },
+    { label: 'TÉCNICO EJECUTOR:', value: constancia.tecnicoResponsable || 'Soporte MUR' },
+  ];
+  if (constancia.ticketItop?.trim()) {
+    rightRows.push({ label: 'TICKET iTOP:', value: constancia.ticketItop.trim() });
   }
 
-  // Guardar / Descargar PDF
-  doc.save(`Constancia_${constancia.codigoConstancia}_${caso.equipo.numeroSerie}.pdf`);
+  curY = drawClientAndDatesBox(doc, fontFamily, curY, caso.cliente, rightRows);
+  curY = drawEquipmentBox(doc, fontFamily, curY, caso.equipo);
+
+  const fallaReportada =
+    incAsociada?.descripcion?.trim() ||
+    constancia.motivoSoporte?.trim() ||
+    'No especificada.';
+  const fallaReal =
+    constancia.fallaReal?.trim() ||
+    constancia.motivoSoporte?.trim() ||
+    'Evaluación operativa sin fallas críticas de hardware.';
+  const estadoEquipo = constancia.resultado?.trim() || 'Operativo / Incidencia solucionada';
+  const observaciones = constancia.observaciones?.trim() || 'Ninguna';
+
+  const specs: LabeledSectionSpec[] = [
+    { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 12.5 },
+    { label: 'FALLA REAL:', content: fallaReal, minHeight: 13.5 },
+    {
+      label: 'ACTIVIDAD\nREALIZADA:',
+      content: constancia.actividadesRealizadas || 'Atención técnica completada.',
+      minHeight: 28,
+      elastic: true,
+    },
+    { label: 'ESTADO EQUIPO:', content: estadoEquipo, minHeight: 11.5 },
+    { label: 'OBSERVACIONES:', content: observaciones, minHeight: 11.5 },
+  ];
+
+  const measured = measureLabeledSections(doc, fontFamily, specs);
+  const { height: consH } = measureConsideracionesHeight(
+    doc,
+    fontFamily,
+    `CONSIDERACIONES: ${CONSIDERACIONES_CONSTANCIA}`
+  );
+  const sigReserve = 23.5 + MUR_LAYOUT.boxGap;
+  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 45);
+
+  for (const sec of measured) {
+    curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
+  }
+
+  const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
+  curY = drawSignatureBoxes(
+    doc,
+    fontFamily,
+    curY,
+    {
+      leftTitle: 'TÉCNICO EJECUTOR',
+      leftPrimary: constancia.tecnicoResponsable || 'Especialista Técnico',
+      leftSecondary: 'MUR Tecnología S.A.C.',
+      rightTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
+      rightPrimary: caso.cliente.contacto || caso.cliente.razonSocial,
+      rightSecondary: !esAlquiler && caso.cliente.ruc ? `RUC/DNI: ${caso.cliente.ruc}` : undefined,
+    },
+    headerOpts
+  );
+
+  drawConsideracionesBox(
+    doc,
+    fontFamily,
+    curY,
+    'CONSIDERACIONES:',
+    CONSIDERACIONES_CONSTANCIA,
+    headerOpts
+  );
+  drawMurFooterAllPages(doc, fontFamily);
+
+  if (!options?.skipSave) {
+    doc.save(`Constancia_${constancia.codigoConstancia}_${codigoCaso}_${caso.equipo.numeroSerie}.pdf`);
+  }
+
+  return doc;
 };

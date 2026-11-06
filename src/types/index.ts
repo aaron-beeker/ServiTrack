@@ -162,6 +162,9 @@ export type EstadoCaso =
   | 'ABIERTO'
   | 'EN DIAGNÓSTICO'
   | 'EN_DIAGNOSTICO'
+  | 'DIAGNOSTICADO'
+  | 'DIAGNOSTICADO_NO_APROBADO'
+  | 'APROBADO_PARA_REPARACION'
   | 'CERRADO SIN REPARACIÓN'
   | 'CERRADO_SIN_REPARACION'
   | 'PENDIENTE DE APROBACIÓN'
@@ -171,6 +174,8 @@ export type EstadoCaso =
   | 'EN PRUEBAS'
   | 'EN_PRUEBAS'
   | 'REPARADO'
+  | 'OBSERVADO'
+  | 'INOPERATIVO'
   | 'ENTREGADO'
   | 'EN GARANTÍA'
   | 'EN_GARANTIA'
@@ -200,13 +205,14 @@ export interface DatosIngresoCaso {
 export interface IncidenciaCaso {
   id: string; // e.g. "INC-001"
   codigoINC: string;
+  codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   fecha: string;
   reportadoPor: string;
   descripcion: string;
   prioridad: PrioridadIncidencia;
   origen: OrigenIncidencia;
   esReingresoGarantia: boolean;
-  vinculoIntervencionPrevia?: string; // id de OS o DT previa
+  vinculoIntervencionPrevia?: string; // id de OS, DT o IT previa
   aplicaGarantia: boolean;
   requiereAnalisisTecnico: boolean; // true: ruta 2B (DT formal), false: ruta 2A (Atención Simple)
   estado: 'REGISTRADA' | 'EN_ATENCION' | 'RESUELTA';
@@ -214,8 +220,9 @@ export interface IncidenciaCaso {
 }
 
 export interface DiagnosticoTecnicoCaso {
-  id: string; // e.g. "DT-001"
+  id: string; // e.g. "DT-000001"
   codigoDT: string;
+  codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   incidenciaId?: string;
   fecha: string;
   tecnicoResponsable: string;
@@ -238,20 +245,35 @@ export interface DiagnosticoTecnicoCaso {
   creadoEl: string;
 }
 
+export interface PruebasQAChecklist {
+  encendidoPostBios: boolean;
+  funcionamientoRepuesto: boolean;
+  pruebasRedPuertos: boolean;
+  limpiezaExterna: boolean;
+}
+
 export interface OrdenServicioTrabajo {
-  id: string; // e.g. "OS-001"
+  id: string; // e.g. "OS-000001"
   codigoOS: string;
+  codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   incidenciaId?: string;
   diagnosticoId?: string;
+  informeTecnicoId?: string; // Vínculo al Informe Técnico emitido (IT-XXXXXX)
   tipo: TipoOrdenServicio;
   tecnicoAsignado: string;
-  actividades: string;
-  horasHombre: number;
+  actividades: string; // Actividades planificadas
+  actividadesRealizadas?: string; // Actividades efectivamente ejecutadas en taller
+  piezasReemplazadas?: string; // Piezas o componentes reemplazados / configuraciones
+  horasHombre: number; // Horas estimadas
+  horasHombreReales?: number; // Horas-hombre reales documentadas
   estado: EstadoOrdenServicio;
   fechaInicio?: string;
   fechaFin?: string;
   pruebasQA?: {
     superoQA: boolean;
+    resultadoOperatividad: 'REPARADO' | 'OBSERVADO' | 'INOPERATIVO';
+    esIrreparable?: boolean;
+    checklist?: PruebasQAChecklist;
     observacionesQA?: string;
     fechaPruebas?: string;
     tecnicoQA?: string;
@@ -260,16 +282,35 @@ export interface OrdenServicioTrabajo {
   creadoEl: string;
 }
 
+export interface InformeTecnicoCaso {
+  id: string; // e.g. "IT-000001"
+  codigoInforme: string; // Correlativo formal único (IT-XXXXXX)
+  codigoCaso: string; // Vínculo al Expediente Único (CASO-XXXXXX)
+  incidenciaId?: string; // Vínculo a la Incidencia origen (INC-XXX)
+  diagnosticoId?: string; // Vínculo al Diagnóstico Técnico (DT-XXXXXX)
+  ordenServicioId?: string; // Vínculo a la Orden de Servicio (OS-XXXXXX)
+  fechaEmision: string;
+  tecnicoResponsable: string;
+  dictamenFinal: 'REPARADO' | 'INOPERATIVO' | 'OBSERVADO';
+  resumenDiagnostico?: string;
+  resumenActividades: string;
+  horasHombre: number;
+  creadoEl: string;
+}
+
 export interface ConstanciaAtencionSimple {
-  id: string; // e.g. "CONST-001"
+  id: string; // e.g. "CA-000001"
   codigoConstancia: string;
+  codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   incidenciaId?: string;
   fecha: string;
   tecnicoResponsable: string;
-  motivoSoporte: string; // Proveniente de la falla reportada de la incidencia inicial
+  motivoSoporte: string; // Falla reportada por el cliente/usuario
+  fallaReal?: string; // Falla real comprobada técnicamente
   actividadesRealizadas: string;
   resultado: string;
   ticketItop?: string | null; // Ticket de iTop al cual se dio asistencia
+  observaciones?: string;
   firmaReceptor?: string | null;
   creadoEl: string;
 }
@@ -294,6 +335,7 @@ export interface ActividadHistorial {
     | 'APROBACION' 
     | 'RECHAZO' 
     | 'ORDEN_SERVICIO' 
+    | 'INFORME_TECNICO'
     | 'ATENCION_SIMPLE' 
     | 'ENTREGA' 
     | 'GARANTIA_ACTIVADA' 
@@ -316,10 +358,11 @@ export interface Caso {
   fechaApertura: string;
   fechaCierre?: string | null;
   
-  // Expediente Único (Documentos y sub-entidades integradas)
+  // Expediente Único (Documentos y sub-entidades integradas y vinculadas)
   incidencias: IncidenciaCaso[];
   diagnosticos: DiagnosticoTecnicoCaso[];
   ordenesServicio: OrdenServicioTrabajo[];
+  informesTecnicos?: InformeTecnicoCaso[];
   constancias: ConstanciaAtencionSimple[];
   garantia: GarantiaCaso;
   historial: ActividadHistorial[];
@@ -331,6 +374,9 @@ export interface Caso {
     receptorDniRuc?: string;
     observaciones?: string;
     responsableEntrega?: string;
+    ordenServicioId?: string;
+    informeTecnicoId?: string;
+    constanciaId?: string;
   } | null;
 
   // Liquidación final

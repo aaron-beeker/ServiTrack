@@ -32,7 +32,7 @@ export function MurLogo({
   }
 
   return (
-    <div className={`inline-flex items-center gap-3 select-none ${className}`}>
+    <div className={`inline-flex items-center gap-3 select-none shrink-0 ${className}`}>
       {!imgError ? (
         <div className="flex flex-col">
           <img

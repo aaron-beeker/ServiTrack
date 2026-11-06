@@ -1,152 +1,171 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
 import { Caso, DiagnosticoTecnicoCaso } from '@/types';
+import {
+  createMurPdfDoc,
+  distributeElasticHeight,
+  drawClientAndDatesBox,
+  drawConsideracionesBox,
+  drawEquipmentBox,
+  drawMeasuredSection,
+  drawMurFooterAllPages,
+  drawMurHeader,
+  drawSignatureBoxes,
+  formatDateMur,
+  LabeledSectionSpec,
+  measureConsideracionesHeight,
+  measureLabeledSections,
+  MUR_LAYOUT,
+  MurHeaderOptions,
+} from './pdfTheme';
 
-interface jsPDFWithAutoTable extends jsPDF {
-  lastAutoTable: {
-    finalY: number;
-  };
-}
+const CONSIDERACIONES_DT =
+  'El presente informe detalla las fallas, observaciones y condiciones identificadas durante el diagnóstico técnico del equipo. Las reparaciones se realizarán únicamente sobre los trabajos previamente autorizados. En caso de no autorizar alguna de las reparaciones recomendadas, el equipo será entregado en las condiciones resultantes de la intervención realizada, quedando registrada dicha incidencia en el presente informe. MUR Tecnología S.A.C. no será responsable por la persistencia o evolución de fallas previamente identificadas y no atendidas. En caso de alguna incidencia técnica en las siguientes 72 horas, realizar el reporte inmediato correspondiente.';
 
 /**
- * Generación de INFORME TÉCNICO FORMAL (Ruta 2B - Diagnóstico Técnico Formal)
- * Sustenta cotizaciones, repuestos requeridos, causa raíz, responsabilidades y dictamen técnico.
+ * Generación de INFORME DE DIAGNÓSTICO TÉCNICO (Ruta 2B) y ACTA DE DEVOLUCIÓN TÉCNICA.
+ * Diseño minimalista oficial MUR Tecnología S.A.C. con tipografía Calibri.
  */
-export const generarInformeTecnicoCasoPDF = (caso: Caso, dt: DiagnosticoTecnicoCaso) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable;
+export const generarInformeTecnicoCasoPDF = async (
+  caso: Caso,
+  dt: DiagnosticoTecnicoCaso,
+  options?: { skipSave?: boolean }
+): Promise<jsPDF> => {
+  const { doc, fontFamily } = await createMurPdfDoc();
 
-  const primaryColor: [number, number, number] = [35, 105, 161]; // #2369A1 Azul MUR
-  const accentColor: [number, number, number] = [220, 38, 38]; // Rojo
-  const headerColor: [number, number, number] = [15, 23, 42]; // Slate 900
-  const textColor: [number, number, number] = [51, 65, 85]; // Slate 700
+  const esRechazado =
+    dt.aprobacionCliente?.aprobado === false || caso.estado === 'CERRADO_SIN_REPARACION';
+  const tituloDoc = esRechazado
+    ? 'ACTA DE DEVOLUCIÓN TÉCNICA'
+    : 'INFORME DE DIAGNÓSTICO TÉCNICO';
 
-  // 1. Cabecera Institucional
-  doc.setFontSize(18);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('MUR TECNOLOGIA S.A.C.', 14, 18);
+  const codigoCaso =
+    (caso.codigoCaso && caso.codigoCaso !== 'undefined' ? caso.codigoCaso : caso.id) ||
+    'CASO-000001';
+  const incAsociada =
+    (dt.incidenciaId ? caso.incidencias?.find((i) => i.id === dt.incidenciaId) : undefined) ||
+    caso.incidencias?.[0];
+  const codigoInc = incAsociada?.codigoINC || dt.incidenciaId || 'INC-001';
 
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text('RUC: 20603786301  |  Laboratorio Central de Diagnóstico', 14, 23);
-  doc.text('Av. Alfredo Benavides 3082, Of. 503, Miraflores - Lima', 14, 27);
-  doc.text('Tel: (01) 640-9200  |  soporte@murtecnologia.com', 14, 31);
-
-  // Recuadro de Título
-  doc.setFontSize(13);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INFORME TÉCNICO DE EVALUACIÓN', 110, 18);
-
-  doc.setFontSize(10);
-  doc.setTextColor(...accentColor);
-  doc.text(`DT N° ${dt.codigoDT}`, 110, 23);
-
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Expediente Único: ${caso.codigoCaso}`, 110, 28);
-  if (caso.contratoAlquiler) {
-    doc.text(`Contrato Alquiler: ${caso.contratoAlquiler}`, 110, 32);
+  const metaParts = [`Expediente: ${codigoCaso}`, `Incidencia: ${codigoInc}`];
+  if (caso.contratoAlquiler?.trim()) {
+    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
   }
 
-  const safeFormatDate = (val: string | null | undefined) => {
-    if (!val) return 'N/A';
-    try {
-      return format(new Date(val), 'dd/MM/yyyy HH:mm');
-    } catch {
-      return String(val);
-    }
+  const headerOpts: MurHeaderOptions = {
+    titulo: tituloDoc,
+    codigo: dt.codigoDT,
+    subtituloMeta: metaParts.join('  ·  '),
   };
 
-  // 2. Tabla Datos Generales y Activo
-  autoTable(doc, {
-    startY: 37,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
-    head: [['DATOS DEL CLIENTE', 'IDENTIFICACIÓN DEL ACTIVO']],
-    body: [
-      [
-        `Razón Social: ${caso.cliente.razonSocial}\nRUC: ${caso.cliente.ruc}\nContacto: ${caso.cliente.contacto || 'N/A'}\nTeléfono: ${caso.cliente.telefono || 'N/A'}`,
-        `Equipo: ${caso.equipo.tipoEquipo}\nMarca / Modelo: ${caso.equipo.marca} ${caso.equipo.modelo}\nNúmero de Serie: ${caso.equipo.numeroSerie}\nFecha Diagnóstico: ${safeFormatDate(dt.fecha)}`
-      ]
-    ],
-    styles: { fontSize: 8.5, cellPadding: 3, textColor: textColor }
-  });
+  let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
-  // 3. Hallazgos y Causa Raíz
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 5,
-    theme: 'grid',
-    headStyles: { fillColor: headerColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
-    head: [['EVALUACIÓN TÉCNICA', 'DICTAMEN DEL LABORATORIO']],
-    body: [
-      ['Tipo de Falla', dt.tipoFalla],
-      ['Técnico Evaluador', dt.tecnicoResponsable],
-      ['Causa Raíz / Hallazgos', dt.hallazgos],
-      ['Diagnóstico Detallado', dt.diagnosticoDetallado],
-      ['Daños Físicos Observados', dt.danosFisicos || 'Sin daños físicos aparentes'],
-      ['Solución / Recomendación', dt.solucionPropuesta || dt.recomendaciones || 'Intervención requerida']
-    ],
-    styles: { fontSize: 8.5, cellPadding: 3, textColor: textColor },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 55 }
-    }
-  });
+  // 1. Cliente y Fechas + Vínculo al Expediente
+  const fechaIngresoRaw = incAsociada?.fecha || caso.fechaApertura || dt.fecha;
+  const fechaDiagRaw = dt.fecha || new Date().toISOString();
 
-  // 4. Tabla de Repuestos Requeridos (si aplica)
-  if (dt.requiereRepuestos && dt.repuestosRequeridos && dt.repuestosRequeridos.length > 0) {
-    const filasRepuestos = dt.repuestosRequeridos.map(r => [
-      r.partNumber,
-      r.descripcion,
-      r.cantidad.toString()
-    ]);
+  const rightRows = [
+    { label: 'EXPEDIENTE:', value: `${codigoCaso} (${codigoInc})` },
+    { label: 'FECHA DE INGRESO:', value: formatDateMur(fechaIngresoRaw) },
+    { label: 'FECHA DIAGNÓSTICO:', value: formatDateMur(fechaDiagRaw) },
+    { label: 'TÉCNICO EVALUADOR:', value: dt.tecnicoResponsable || 'Laboratorio MUR' },
+    { label: 'TIPIFICACIÓN:', value: dt.tipoFalla || 'HARDWARE' },
+  ];
 
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 5,
-      theme: 'grid',
-      headStyles: { fillColor: [40, 116, 166], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
-      head: [['Part Number', 'Descripción del Repuesto / Componente', 'Cantidad']],
-      body: filasRepuestos,
-      styles: { fontSize: 8.5, cellPadding: 2.5, textColor: textColor }
-    });
+  curY = drawClientAndDatesBox(doc, fontFamily, curY, caso.cliente, rightRows);
+
+  // 2. Activo / Equipo
+  curY = drawEquipmentBox(doc, fontFamily, curY, caso.equipo);
+
+  // 3. Secciones técnicas modulares (idénticas al formato DT oficial)
+  const fallaReportada =
+    incAsociada?.descripcion?.trim() ||
+    caso.incidencias?.[0]?.descripcion?.trim() ||
+    'No especificada en el ingreso.';
+
+  const diagnosticoPartes: string[] = [];
+  if (dt.diagnosticoDetallado?.trim()) {
+    diagnosticoPartes.push(dt.diagnosticoDetallado.trim());
+  }
+  if (
+    dt.hallazgos?.trim() &&
+    (!dt.diagnosticoDetallado ||
+      !dt.diagnosticoDetallado.toLowerCase().includes(dt.hallazgos.trim().toLowerCase()))
+  ) {
+    diagnosticoPartes.push(`Causa raíz / Hallazgos: ${dt.hallazgos.trim()}`);
+  }
+  const diagnosticoTexto =
+    diagnosticoPartes.join('\n') || 'Evaluación técnica de laboratorio completada.';
+
+  let accionRecomendada =
+    dt.solucionPropuesta?.trim() ||
+    dt.recomendaciones?.trim() ||
+    'Realizar intervención técnica en laboratorio previa autorización del cliente.';
+
+  if (dt.aprobacionCliente) {
+    const decisionStr = dt.aprobacionCliente.aprobado
+      ? `Propuesta aprobada por el cliente (${formatDateMur(dt.aprobacionCliente.fechaDecision)}).`
+      : `Propuesta no aprobada (${dt.aprobacionCliente.motivoRechazo || 'Devolución solicitada'}).`;
+    accionRecomendada = `${accionRecomendada}\nResolución: ${decisionStr}`;
   }
 
-  // 5. Estado de Decisión / Aprobación
-  const posY = doc.lastAutoTable.finalY + 8;
-  doc.setFontSize(8.5);
-  doc.setTextColor(...headerColor);
-  doc.setFont('helvetica', 'bold');
-  const txtAprobacion = dt.aprobacionCliente 
-    ? (dt.aprobacionCliente.aprobado ? 'PROPUESTA APROBADA POR CLIENTE' : `RECHAZADO: ${dt.aprobacionCliente.motivoRechazo || 'Sin detalle'}`)
-    : 'ESTADO: PENDIENTE DE APROBACIÓN DE COTIZACIÓN';
-  doc.text(`Dictamen Comercial: ${txtAprobacion}`, 14, posY);
+  const observacionesTexto =
+    dt.danosFisicos?.trim() || 'Sin daños físicos externos adicionales al desgaste normal por uso.';
 
-  // 6. Bloques de Firmas
-  const firmasY = posY + 28;
-  doc.setDrawColor(148, 163, 184);
-  doc.line(25, firmasY, 85, firmasY);
-  doc.setFontSize(8.5);
-  doc.setTextColor(...headerColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('LABORATORIO DE HARDWARE', 55, firmasY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.text(dt.tecnicoResponsable, 55, firmasY + 8, { align: 'center' });
-  doc.text('MUR Tecnología S.A.C.', 55, firmasY + 12, { align: 'center' });
+  const piezasTexto =
+    dt.requiereRepuestos && dt.repuestosRequeridos && dt.repuestosRequeridos.length > 0
+      ? dt.repuestosRequeridos
+          .map((r) => `[${r.partNumber}] ${r.descripcion} (Cant.: ${r.cantidad})`)
+          .join('\n')
+      : 'Ninguno';
 
-  doc.line(125, firmasY, 185, firmasY);
-  doc.setFont('helvetica', 'bold');
-  const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
-  const tituloFirma = esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE';
-  doc.text(tituloFirma, 155, firmasY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  const nombreFirma = caso.cliente.contacto || caso.cliente.razonSocial;
-  doc.text(nombreFirma, 155, firmasY + 8, { align: 'center' });
-  if (!esAlquiler && caso.cliente.ruc) {
-    doc.text(`RUC: ${caso.cliente.ruc}`, 155, firmasY + 12, { align: 'center' });
+  const specs: LabeledSectionSpec[] = [
+    { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 13.5 },
+    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 36, elastic: true },
+    { label: 'ACCIÓN\nRECOMENDADA:', content: accionRecomendada, minHeight: 14.5 },
+    { label: 'OBSERVACIONES:', content: observacionesTexto, minHeight: 12.5 },
+    { label: 'PIEZAS REQUERIDA:', content: piezasTexto, minHeight: 12.5 },
+  ];
+
+  const measured = measureLabeledSections(doc, fontFamily, specs);
+  const { height: consH } = measureConsideracionesHeight(
+    doc,
+    fontFamily,
+    `CONSIDERACIONES: ${CONSIDERACIONES_DT}`
+  );
+  const sigReserve = esRechazado ? 23.5 + MUR_LAYOUT.boxGap : 0;
+  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 55);
+
+  for (const sec of measured) {
+    curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
   }
 
-  doc.save(`InformeTecnico_${dt.codigoDT}_${caso.codigoCaso}.pdf`);
+  if (esRechazado) {
+    const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
+    curY = drawSignatureBoxes(
+      doc,
+      fontFamily,
+      curY,
+      {
+        leftTitle: 'LABORATORIO DE HARDWARE',
+        leftPrimary: dt.tecnicoResponsable || 'Especialista Técnico',
+        leftSecondary: 'MUR Tecnología S.A.C.',
+        rightTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE',
+        rightPrimary: caso.cliente.contacto || caso.cliente.razonSocial,
+        rightSecondary: !esAlquiler && caso.cliente.ruc ? `RUC/DNI: ${caso.cliente.ruc}` : undefined,
+      },
+      headerOpts
+    );
+  }
+
+  drawConsideracionesBox(doc, fontFamily, curY, 'CONSIDERACIONES:', CONSIDERACIONES_DT, headerOpts);
+  drawMurFooterAllPages(doc, fontFamily);
+
+  if (!options?.skipSave) {
+    const nombreArchivo = esRechazado
+      ? `ActaDevolucion_${dt.codigoDT}_${codigoCaso}_${caso.equipo.numeroSerie}.pdf`
+      : `InformeDiagnostico_${dt.codigoDT}_${codigoCaso}_${caso.equipo.numeroSerie}.pdf`;
+    doc.save(nombreArchivo);
+  }
+
+  return doc;
 };

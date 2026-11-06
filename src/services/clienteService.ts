@@ -4,6 +4,17 @@ import { Cliente } from '@/types';
 
 const CLIENTES_PREDETERMINADOS: Cliente[] = [
   {
+    id: "cli-reniec",
+    clienteId: "CLI-000",
+    razonSocial: "Registro Nacional de Identificación y Estado Civil (RENIEC)",
+    ruc: "20295613620",
+    contacto: "Miguel Cannon Valladares",
+    telefono: "903401613",
+    correo: "mcannon@reniec.gob.pe",
+    direccion: "Jr. Bolivia 109, Lima",
+    creadoEl: "2026-08-01T08:00:00Z"
+  },
+  {
     id: "cli-oxxo",
     clienteId: "CLI-001",
     razonSocial: "OXXO S.A.C.",

@@ -1,352 +1,395 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
-import { OrdenServicio, Caso } from '@/types';
+import { Caso, InformeTecnicoCaso, OrdenServicio } from '@/types';
+import {
+  createMurPdfDoc,
+  distributeElasticHeight,
+  drawClientAndDatesBox,
+  drawConsideracionesBox,
+  drawEquipmentBox,
+  drawMeasuredSection,
+  drawMurFooterAllPages,
+  drawMurHeader,
+  drawSignatureBoxes,
+  formatDateMur,
+  formatTimeMur,
+  KeyValueRow,
+  LabeledSectionSpec,
+  measureConsideracionesHeight,
+  measureLabeledSections,
+  MUR_LAYOUT,
+  MurHeaderOptions,
+} from './pdfTheme';
 
-interface jsPDFWithAutoTable extends jsPDF {
-  lastAutoTable: {
-    finalY: number;
-  };
-}
+const CONSIDERACIONES_INFORME_SERVICIO =
+  'El presente informe técnico deja constancia de las labores de diagnóstico, intervención en laboratorio y protocolo de pruebas de calidad (QA) efectuadas sobre el equipo descrito. El cliente o usuario receptor declara haber verificado la entrega y condición operativa consignada. La garantía técnica aplica exclusivamente sobre los repuestos instalados y la mano de obra detallada conforme a los términos de MUR Tecnología S.A.C. En caso de alguna incidencia técnica en las siguientes 72 horas, realizar el reporte inmediato correspondiente.';
 
 /**
- * ETAPA 4: Generación del INFORME TÉCNICO FINAL
- * Reemplaza la hoja 'ConstAtenciónServicio' con el Informe Técnico de cierre,
- * incluyendo actividades de intervención, QA, y recuadros para firma y sello de conformidad.
+ * ETAPA 4: Generación del INFORME TÉCNICO DE SERVICIO para OrdenServicio (modelo clásico).
  */
-export const generarInformeTecnico = (orden: OrdenServicio, esAlquilerParam?: boolean) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable;
-  
-  const primaryColor: [number, number, number] = [30, 58, 138]; // Azul corporativo
-  const accentColor: [number, number, number] = [16, 185, 129]; // Verde esmeralda conformidad
-  const textColor: [number, number, number] = [30, 41, 59];
+export const generarInformeTecnico = async (
+  orden: OrdenServicio,
+  esAlquilerParam?: boolean,
+  options?: { skipSave?: boolean }
+): Promise<jsPDF> => {
+  const { doc, fontFamily } = await createMurPdfDoc();
 
-  // 1. Encabezado Institucional
-  doc.setFontSize(20);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('MUR TECNOLOGIA S.A.C.', 14, 18);
-  
-  doc.setFontSize(9);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text('RUC: 20603786301  |  Informe Técnico Final y Conformidad de Servicio', 14, 24);
-  doc.text('Jr. Rodin N.º 129 Dpto. 301, Surquillo - Lima', 14, 29);
-
-  // Código de Informe Técnico Final
-  doc.setFontSize(14);
-  doc.setTextColor(220, 38, 38);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`INFORME TÉCNICO N° ${orden.codigoDT}`, 110, 18);
-
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Estado Final: ${orden.estadoGeneral}`, 110, 24);
-
-  const safeFormatDate = (val: string | null | undefined) => {
-    if (!val) return 'N/A';
-    try {
-      return format(new Date(val), 'dd/MM/yyyy HH:mm');
-    } catch {
-      return String(val);
-    }
+  const headerOpts: MurHeaderOptions = {
+    titulo: 'INFORME TÉCNICO DE SERVICIO',
+    codigo: orden.codigoDT,
+    subtituloMeta: `Estado Final: ${orden.estadoGeneral}`,
   };
 
-  // 2. Bloque Cliente y Entrega
-  autoTable(doc, {
-    startY: 36,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DATOS DEL CLIENTE', 'DATOS DE RECEPCIÓN Y ENTREGA']],
-    body: [
-      [
-        `Razón Social: ${orden.ingreso.cliente.razonSocial}\nRUC: ${orden.ingreso.cliente.ruc}\nContacto: ${orden.ingreso.cliente.contacto}\nTeléfono: ${orden.ingreso.cliente.telefono || 'N/A'}`,
-        `Fecha de Entrega: ${safeFormatDate(orden.cierre.fechaEntrega)}\nLugar: ${orden.cierre.lugarEntrega || 'Taller MUR Tecnología'}\nReceptor: ${orden.cierre.receptorNombre || orden.ingreso.cliente.contacto}\nDNI/RUC Receptor: ${orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc}`
-      ],
-    ],
-    styles: { fontSize: 9, cellPadding: 3.5, valign: 'top' }
-  });
+  let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
-  // 3. Bloque Equipo
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 6,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DATOS DEL EQUIPO INTERVENIDO', '']],
-    body: [
-      ['Tipo de Dispositivo:', orden.ingreso.equipo.tipoEquipo || 'Laptop'],
-      ['Marca y Modelo:', `${orden.ingreso.equipo.marca} ${orden.ingreso.equipo.modelo}`],
-      ['Número de Serie (S/N):', orden.ingreso.equipo.numeroSerie],
-      ['Part Number (P/N):', orden.ingreso.equipo.partNumber || 'No especificado'],
-    ],
-    columnStyles: {
-      0: { cellWidth: 55, fontStyle: 'bold' }
+  const rightRows: KeyValueRow[] = [
+    { label: 'FECHA DE INGRESO:', value: formatDateMur(orden.ingreso.fechaIngreso) },
+    { label: 'FECHA DE ENTREGA:', value: formatDateMur(orden.cierre.fechaEntrega, 'En proceso') },
+    {
+      label: 'TÉCNICO EJECUTOR:',
+      value: orden.intervencion.tecnicoAsignado || 'Especialista de Taller',
     },
-    styles: { fontSize: 9, cellPadding: 2.5 }
-  });
+    { label: 'HORAS-HOMBRE:', value: `${orden.intervencion.horasHombre || 1} h` },
+  ];
 
-  // 4. Detalle de la Intervención y Solución
-  const repuestosInstalados = orden.diagnostico.requiereRepuestos && orden.diagnostico.repuestosRequeridos && orden.diagnostico.repuestosRequeridos.length > 0
-    ? orden.diagnostico.repuestosRequeridos.map(r => `• [${r.partNumber}] ${r.descripcion} (${r.cantidad} und)`).join('\n')
-    : 'Ninguno (Mantenimiento físico y/o configuración lógica)';
+  curY = drawClientAndDatesBox(doc, fontFamily, curY, orden.ingreso.cliente, rightRows);
+  curY = drawEquipmentBox(doc, fontFamily, curY, orden.ingreso.equipo);
 
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 6,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DETALLES DEL SERVICIO TÉCNICO Y CONTROL DE CALIDAD']],
-    body: [
-      [{ content: 'Falla Inicial Reportada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [orden.ingreso.fallaReportada],
-      [{ content: 'Diagnóstico y Causa Raíz Comprobada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [orden.diagnostico.diagnosticoDetallado || 'Diagnóstico de hardware/software completado'],
-      [{ content: 'Actividades Realizadas en Taller:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [orden.intervencion.actividadesRealizadas || 'Servicio técnico, sustitución de partes y pruebas de operatividad.'],
-      [{ content: 'Repuestos Homologados Instalados:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [repuestosInstalados],
-      [{ content: 'Datos de Intervención y Horas Invertidas:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [`Técnico Ejecutor: ${orden.intervencion.tecnicoAsignado || 'Especialista de Taller'} | Horas-Hombre: ${orden.intervencion.horasHombre || 1} hrs | QA Operativo: ${orden.intervencion.pruebasQA?.superoPruebas !== false ? 'CONFORME (100% Operativo)' : 'OBSERVADO / NO CONFORME'}`],
-      [{ content: 'Observaciones de Entrega:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [orden.cierre.observacionesFinales || 'Equipo entregado en perfecto estado operativo con pruebas de encendido conformes.']
-    ],
-    styles: { fontSize: 8.5, cellPadding: 2.8 }
-  });
+  const repuestosInstalados =
+    orden.diagnostico.requiereRepuestos &&
+    orden.diagnostico.repuestosRequeridos &&
+    orden.diagnostico.repuestosRequeridos.length > 0
+      ? orden.diagnostico.repuestosRequeridos
+          .map((r) => `[${r.partNumber}] ${r.descripcion} (Cant.: ${r.cantidad})`)
+          .join('\n')
+      : 'Ninguno (Mantenimiento físico y/o configuración lógica)';
 
-  // 5. Cláusula de Conformidad
-  const currentY = doc.lastAutoTable.finalY + 6;
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 116, 139);
-  const legalText = `DECLARACIÓN DE CONFORMIDAD Y ACEPTACIÓN DEL SERVICIO:
-El cliente/receptor declara recibir el equipo en óptimas condiciones de funcionamiento y estética, habiendo verificado las pruebas de operatividad correspondientes.
-La garantía del servicio técnico cubre exclusivamente los componentes instalados y la mano de obra documentada según los términos de MUR TECNOLOGÍA S.A.C.`;
-  doc.text(legalText, 14, currentY);
+  const qaDictamen =
+    orden.intervencion.pruebasQA?.superoPruebas !== false
+      ? 'Operativo / QA Conforme'
+      : 'Observado / No Conforme';
 
-  // 6. Recuadros para Firma y Sello de Conformidad (reemplaza ConstAtenciónServicio)
-  const boxY = currentY + 12;
-  
-  // Recuadro Firma Cliente / Usuario
-  doc.setDrawColor(148, 163, 184);
-  doc.rect(14, boxY, 86, 32);
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  doc.setFont('helvetica', 'bold');
+  const specs: LabeledSectionSpec[] = [
+    { label: 'FALLA REPORTADA:', content: orden.ingreso.fallaReportada, minHeight: 12 },
+    {
+      label: 'DIAGNÓSTICO:',
+      content:
+        orden.diagnostico.diagnosticoDetallado || 'Evaluación de hardware y software completada.',
+      minHeight: 16,
+    },
+    {
+      label: 'ACTIVIDADES\nREALIZADAS:',
+      content:
+        orden.intervencion.actividadesRealizadas ||
+        'Servicio técnico especializado y pruebas integrales de operatividad.',
+      minHeight: 24,
+      elastic: true,
+    },
+    { label: 'CONTROL QA:', content: qaDictamen, minHeight: 11.5 },
+    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 11.5 },
+    {
+      label: 'OBSERVACIONES:',
+      content:
+        orden.cierre.observacionesFinales ||
+        'Equipo verificado con protocolo de encendido y funcionamiento conforme.',
+      minHeight: 11.5,
+    },
+  ];
 
-  const esAlquiler = esAlquilerParam ?? Boolean(
-    orden.esAlquiler ||
-    orden.origen === 'ALQUILER' ||
-    Boolean(orden.contratoAlquiler?.trim()) ||
-    orden.ingreso?.origen === 'ALQUILER' ||
-    Boolean(orden.ingreso?.contratoAlquiler?.trim()) ||
-    orden.ingreso?.esAlquiler
+  const measured = measureLabeledSections(doc, fontFamily, specs);
+  const { height: consH } = measureConsideracionesHeight(
+    doc,
+    fontFamily,
+    `CONSIDERACIONES: ${CONSIDERACIONES_INFORME_SERVICIO}`
   );
+  const sigReserve = 23.5 + MUR_LAYOUT.boxGap;
+  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 40);
 
-  if (esAlquiler) {
-    doc.text('USUARIO', 18, boxY + 6);
-    doc.setFont('helvetica', 'normal');
-    const nombreUsuario = orden.cierre.receptorNombre || orden.ingreso.cliente.contacto || orden.ingreso.cliente.razonSocial;
-    doc.text(nombreUsuario, 18, boxY + 24);
-  } else {
-    doc.text('FIRMA Y SELLO DE CONFORMIDAD DEL CLIENTE', 18, boxY + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Receptor: ${orden.cierre.receptorNombre || orden.ingreso.cliente.contacto}`, 18, boxY + 24);
-    doc.text(`DNI / RUC: ${orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc}`, 18, boxY + 29);
+  for (const sec of measured) {
+    curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
   }
 
-  // Recuadro Firma Técnico Responsable
-  doc.rect(108, boxY, 88, 32);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FIRMA DEL TÉCNICO RESPONSABLE', 112, boxY + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Técnico: ${orden.intervencion.tecnicoAsignado || 'Técnico Especialista'}`, 112, boxY + 24);
-  doc.text('MUR TECNOLOGIA S.A.C. - Laboratorio Técnico', 112, boxY + 29);
+  const esAlquiler =
+    esAlquilerParam ??
+    Boolean(
+      orden.esAlquiler ||
+        orden.origen === 'ALQUILER' ||
+        Boolean(orden.contratoAlquiler?.trim()) ||
+        orden.ingreso?.origen === 'ALQUILER' ||
+        Boolean(orden.ingreso?.contratoAlquiler?.trim()) ||
+        orden.ingreso?.esAlquiler
+    );
 
-  // Pie de página
-  const pageHeight = doc.internal.pageSize.height;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text('MUR TECNOLOGÍA S.A.C.  |  Informe Técnico de Servicio  |  Lima - Perú', 14, pageHeight - 8);
+  const receptorNom =
+    orden.cierre.receptorNombre ||
+    orden.ingreso.cliente.contacto ||
+    orden.ingreso.cliente.razonSocial;
+  const receptorDoc = orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc;
 
-  // Guardar PDF como _InformeTecnico.pdf
-  doc.save(`${orden.codigoDT}_InformeTecnico.pdf`);
+  curY = drawSignatureBoxes(
+    doc,
+    fontFamily,
+    curY,
+    {
+      leftTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
+      leftPrimary: esAlquiler ? receptorNom : `Receptor: ${receptorNom}`,
+      leftSecondary: !esAlquiler && receptorDoc ? `DNI / RUC: ${receptorDoc}` : undefined,
+      rightTitle: 'TÉCNICO RESPONSABLE',
+      rightPrimary: orden.intervencion.tecnicoAsignado || 'Especialista Técnico',
+      rightSecondary: 'MUR Tecnología S.A.C. - Laboratorio Técnico',
+    },
+    headerOpts
+  );
+
+  drawConsideracionesBox(
+    doc,
+    fontFamily,
+    curY,
+    'CONSIDERACIONES:',
+    CONSIDERACIONES_INFORME_SERVICIO,
+    headerOpts
+  );
+  drawMurFooterAllPages(doc, fontFamily);
+
+  if (!options?.skipSave) {
+    doc.save(`${orden.codigoDT}_InformeTecnico.pdf`);
+  }
+
+  return doc;
 };
 
 /**
- * Generación del INFORME TÉCNICO FINAL para Expedientes / Casos
- * Aplica para intervenciones concluidas y entregadas, incorporando:
- * - Diagnóstico formal, actividades ejecutadas y control de calidad QA
- * - Regla de firma para alquileres (USUARIO solo nombre, sin RUC) y estándar (CONFORMIDAD con RUC)
+ * Generación del INFORME TÉCNICO DE SERVICIO para Expedientes / Casos (Etapas 3 y 4).
+ * Incorpora correlativo único IT-XXXXXX, vínculo explícito al Expediente CASO-XXXXXX,
+ * diagnóstico, actividades ejecutadas, horas-hombre, checklist QA y regla de firmas.
  */
-export const generarInformeTecnicoFinalCaso = (caso: Caso) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable;
-  
-  const primaryColor: [number, number, number] = [30, 58, 138]; // Azul corporativo
-  const textColor: [number, number, number] = [30, 41, 59];
+export const generarInformeTecnicoFinalCaso = async (
+  caso: Caso,
+  options?: { skipSave?: boolean; informe?: InformeTecnicoCaso | null; osId?: string }
+): Promise<jsPDF> => {
+  const { doc, fontFamily } = await createMurPdfDoc();
 
-  // 1. Encabezado Institucional
-  doc.setFontSize(20);
-  doc.setTextColor(...primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('MUR TECNOLOGIA S.A.C.', 14, 18);
-  
-  doc.setFontSize(9);
-  doc.setTextColor(...textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text('RUC: 20603786301  |  Informe Técnico Final y Conformidad de Servicio', 14, 24);
-  doc.text('Jr. Rodin N.º 129 Dpto. 301, Surquillo - Lima', 14, 29);
+  const codigoCaso =
+    (caso.codigoCaso && caso.codigoCaso !== 'undefined' ? caso.codigoCaso : caso.id) ||
+    'CASO-000001';
 
-  // Código de Informe Técnico Final
-  doc.setFontSize(14);
-  doc.setTextColor(220, 38, 38);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`INFORME TÉCNICO N° ${caso.codigoCaso}`, 110, 18);
+  const osActiva = options?.osId
+    ? caso.ordenesServicio?.find((o) => o.codigoOS === options.osId || o.id === options.osId)
+    : options?.informe?.ordenServicioId
+      ? caso.ordenesServicio?.find(
+          (o) =>
+            o.codigoOS === options.informe?.ordenServicioId ||
+            o.id === options.informe?.ordenServicioId
+        )
+      : caso.ordenesServicio?.[caso.ordenesServicio.length - 1];
 
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Estado Final: ${caso.estado}`, 110, 24);
-  if (caso.contratoAlquiler) {
-    doc.text(`Contrato Alquiler: ${caso.contratoAlquiler}`, 110, 29);
-  }
+  const informeActivo =
+    options?.informe ||
+    (osActiva
+      ? caso.informesTecnicos?.find(
+          (it) =>
+            (osActiva.informeTecnicoId && it.codigoInforme === osActiva.informeTecnicoId) ||
+            it.ordenServicioId === osActiva.codigoOS ||
+            it.ordenServicioId === osActiva.id
+        )
+      : undefined) ||
+    caso.informesTecnicos?.[caso.informesTecnicos.length - 1];
 
-  const safeFormatDate = (val: string | null | undefined) => {
-    if (!val) return 'N/A';
-    try {
-      return format(new Date(val), 'dd/MM/yyyy HH:mm');
-    } catch {
-      return String(val);
-    }
-  };
+  const dtRefId = osActiva?.diagnosticoId || informeActivo?.diagnosticoId;
+  const ultimoDT = dtRefId
+    ? caso.diagnosticos?.find((d) => d.codigoDT === dtRefId || d.id === dtRefId) ||
+      caso.diagnosticos?.[caso.diagnosticos.length - 1]
+    : caso.diagnosticos?.[caso.diagnosticos.length - 1];
 
-  const ultimoDT = caso.diagnosticos?.[caso.diagnosticos.length - 1];
-  const ultimaOS = caso.ordenesServicio?.[caso.ordenesServicio.length - 1];
-  const primeraInc = caso.incidencias?.[0];
+  const incRefId =
+    osActiva?.incidenciaId || informeActivo?.incidenciaId || ultimoDT?.incidenciaId;
+  const primeraInc = incRefId
+    ? caso.incidencias?.find((i) => i.id === incRefId || i.codigoINC === incRefId) ||
+      caso.incidencias?.[0]
+    : caso.incidencias?.[0];
+
   const entrega = caso.entrega;
   const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
 
-  // 2. Bloque Cliente y Entrega
-  const fechaEntregaStr = safeFormatDate(entrega?.fechaEntrega || caso.fechaCierre || new Date().toISOString());
-  const receptorStr = entrega?.receptorNombre || caso.cliente.contacto || caso.cliente.razonSocial;
-  const receptorDniStr = esAlquiler 
-    ? 'Usuario Asignado' 
-    : (entrega?.receptorDniRuc || caso.cliente.ruc || 'N/A');
+  const codigoInforme =
+    informeActivo?.codigoInforme || osActiva?.informeTecnicoId || 'IT-000001';
 
-  autoTable(doc, {
-    startY: 36,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DATOS DEL CLIENTE', 'DATOS DE RECEPCIÓN Y ENTREGA']],
-    body: [
-      [
-        `Razón Social: ${caso.cliente.razonSocial}\nRUC: ${caso.cliente.ruc}\nContacto: ${caso.cliente.contacto || 'N/A'}\nTeléfono: ${caso.cliente.telefono || 'N/A'}`,
-        `Fecha de Entrega: ${fechaEntregaStr}\nLugar: ${esAlquiler ? 'Instalación / En sitio' : 'Taller MUR Tecnología'}\nReceptor: ${receptorStr}\n${esAlquiler ? '' : `DNI/RUC Receptor: ${receptorDniStr}`}`.trim()
-      ],
-    ],
-    styles: { fontSize: 9, cellPadding: 3.5, valign: 'top' }
-  });
-
-  // 3. Bloque Equipo
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 6,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DATOS DEL EQUIPO INTERVENIDO', '']],
-    body: [
-      ['Tipo de Dispositivo:', caso.equipo.tipoEquipo || 'Laptop'],
-      ['Marca y Modelo:', `${caso.equipo.marca} ${caso.equipo.modelo}`],
-      ['Número de Serie (S/N):', caso.equipo.numeroSerie],
-      ['Part Number (P/N):', caso.equipo.partNumber || 'No especificado'],
-    ],
-    columnStyles: {
-      0: { cellWidth: 55, fontStyle: 'bold' }
-    },
-    styles: { fontSize: 9, cellPadding: 2.5 }
-  });
-
-  // 4. Detalle de la Intervención y Solución
-  const repuestosInstalados = ultimoDT?.requiereRepuestos && ultimoDT?.repuestosRequeridos && ultimoDT.repuestosRequeridos.length > 0
-    ? ultimoDT.repuestosRequeridos.map(r => `• [${r.partNumber}] ${r.descripcion} (${r.cantidad} und)`).join('\n')
-    : 'Mantenimiento preventivo/correctivo y pruebas operativas sin sustitución de partes.';
-
-  const fallaReportada = primeraInc?.descripcion || 'Servicio técnico solicitado por el usuario.';
-  const diagnosticoTexto = ultimoDT?.diagnosticoDetallado || ultimoDT?.hallazgos || 'Evaluación técnica completada.';
-  const actividadesTexto = ultimaOS?.actividades || 'Servicio técnico especializado y pruebas de funcionalidad.';
-  const tecnicoNombre = ultimaOS?.tecnicoAsignado || ultimoDT?.tecnicoResponsable || 'Especialista de Taller';
-  const horasHombre = ultimaOS?.horasHombre || 1;
-  const qaStatus = ultimaOS?.pruebasQA?.superoQA !== false ? 'CONFORME (100% Operativo)' : 'OBSERVADO / NO CONFORME';
-  const obsFinales = entrega?.observaciones || 'Equipo entregado en óptimas condiciones de funcionamiento con pruebas operativas conformes.';
-
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 6,
-    theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
-    head: [['DETALLES DEL SERVICIO TÉCNICO Y CONTROL DE CALIDAD']],
-    body: [
-      [{ content: 'Falla Inicial Reportada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [fallaReportada],
-      [{ content: 'Diagnóstico y Causa Raíz Comprobada:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [diagnosticoTexto],
-      [{ content: 'Actividades Realizadas en Taller:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [actividadesTexto],
-      [{ content: 'Repuestos Homologados Instalados:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [repuestosInstalados],
-      [{ content: 'Datos de Intervención y Horas Invertidas:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [`Técnico Ejecutor: ${tecnicoNombre} | Horas-Hombre: ${horasHombre} hrs | QA Operativo: ${qaStatus}`],
-      [{ content: 'Observaciones de Entrega:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }],
-      [obsFinales]
-    ],
-    styles: { fontSize: 8.5, cellPadding: 2.8 }
-  });
-
-  // 5. Cláusula de Conformidad
-  const currentY = doc.lastAutoTable.finalY + 6;
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 116, 139);
-  const legalText = `DECLARACIÓN DE CONFORMIDAD Y ACEPTACIÓN DEL SERVICIO:
-El cliente/receptor declara recibir el equipo en óptimas condiciones de funcionamiento y estética, habiendo verificado las pruebas de operatividad correspondientes.
-La garantía del servicio técnico cubre exclusivamente los componentes instalados y la mano de obra documentada según los términos de MUR TECNOLOGÍA S.A.C.`;
-  doc.text(legalText, 14, currentY);
-
-  // 6. Recuadros para Firma y Sello de Conformidad
-  const boxY = currentY + 12;
-
-  // Recuadro Firma Cliente / Usuario
-  doc.setDrawColor(148, 163, 184);
-  doc.rect(14, boxY, 86, 32);
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  doc.setFont('helvetica', 'bold');
-
-  if (esAlquiler) {
-    doc.text('USUARIO', 18, boxY + 6);
-    doc.setFont('helvetica', 'normal');
-    const nombreUsuario = entrega?.receptorNombre || caso.cliente.contacto || caso.cliente.razonSocial;
-    doc.text(nombreUsuario, 18, boxY + 24);
-  } else {
-    doc.text('FIRMA Y SELLO DE CONFORMIDAD DEL CLIENTE', 18, boxY + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Receptor: ${entrega?.receptorNombre || caso.cliente.contacto}`, 18, boxY + 24);
-    doc.text(`DNI / RUC: ${entrega?.receptorDniRuc || caso.cliente.ruc}`, 18, boxY + 29);
+  const metaParts = [`Expediente: ${codigoCaso}`];
+  if (ultimoDT?.codigoDT) {
+    metaParts.push(`Diagnóstico: ${ultimoDT.codigoDT}`);
+  }
+  if (osActiva?.codigoOS) {
+    metaParts.push(`Orden: ${osActiva.codigoOS}`);
+  }
+  if (caso.contratoAlquiler?.trim()) {
+    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
   }
 
-  // Recuadro Firma Técnico Responsable
-  doc.rect(108, boxY, 88, 32);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FIRMA DEL TÉCNICO RESPONSABLE', 112, boxY + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Técnico: ${tecnicoNombre}`, 112, boxY + 24);
-  doc.text('MUR TECNOLOGIA S.A.C. - Laboratorio Técnico', 112, boxY + 29);
+  const headerOpts: MurHeaderOptions = {
+    titulo: 'INFORME TÉCNICO DE SERVICIO',
+    codigo: codigoInforme,
+    subtituloMeta: metaParts.join('  ·  '),
+  };
 
-  // Pie de página
-  const pageHeight = doc.internal.pageSize.height;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text('MUR TECNOLOGÍA S.A.C.  |  Informe Técnico de Servicio  |  Lima - Perú', 14, pageHeight - 8);
+  let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
-  // Guardar PDF como _InformeTecnico.pdf
-  doc.save(`${caso.codigoCaso}_InformeTecnico.pdf`);
+  const fechaIngresoRaw =
+    primeraInc?.fecha || caso.fechaApertura || new Date().toISOString();
+  const fechaSalidaRaw =
+    entrega?.fechaEntrega ||
+    informeActivo?.fechaEmision ||
+    osActiva?.fechaFin ||
+    osActiva?.pruebasQA?.fechaPruebas ||
+    caso.fechaCierre ||
+    new Date().toISOString();
+
+  const fIn = formatDateMur(fechaIngresoRaw);
+  const hIn = formatTimeMur(fechaIngresoRaw);
+  const fOut = formatDateMur(fechaSalidaRaw);
+  const hOut = formatTimeMur(fechaSalidaRaw);
+
+  const tecnicoNombre =
+    informeActivo?.tecnicoResponsable ||
+    osActiva?.tecnicoAsignado ||
+    ultimoDT?.tecnicoResponsable ||
+    'Especialista de Taller';
+  const horasHombre =
+    informeActivo?.horasHombre || osActiva?.horasHombreReales || osActiva?.horasHombre || 1;
+
+  const trazabilidadLinea = [
+    primeraInc?.codigoINC,
+    ultimoDT?.codigoDT,
+    osActiva?.codigoOS,
+  ]
+    .filter(Boolean)
+    .join(' / ') || 'INC-001';
+
+  const rightRows: KeyValueRow[] = [
+    { label: 'EXPEDIENTE:', value: codigoCaso },
+    { label: 'TRAZABILIDAD:', value: trazabilidadLinea },
+    { label: 'FECHA DE INGRESO:', value: hIn ? `${fIn} (${hIn})` : fIn },
+    { label: 'FECHA DE SALIDA:', value: hOut ? `${fOut} (${hOut})` : fOut },
+    { label: 'TÉCNICO / TIEMPO:', value: `${tecnicoNombre} (${horasHombre} h)` },
+  ];
+
+  curY = drawClientAndDatesBox(doc, fontFamily, curY, caso.cliente, rightRows);
+  curY = drawEquipmentBox(doc, fontFamily, curY, caso.equipo);
+
+  const fallaReportada =
+    primeraInc?.descripcion?.trim() || 'Servicio técnico solicitado por el usuario.';
+  const diagnosticoTexto =
+    ultimoDT?.diagnosticoDetallado?.trim() ||
+    ultimoDT?.hallazgos?.trim() ||
+    informeActivo?.resumenDiagnostico?.trim() ||
+    'Inspección técnica general y verificación de componentes internos.';
+  const actividadesTexto =
+    osActiva?.actividadesRealizadas?.trim() ||
+    osActiva?.actividades?.trim() ||
+    informeActivo?.resumenActividades?.trim() ||
+    'Intervención técnica especializada y validación funcional en laboratorio.';
+
+  const repuestosInstalados =
+    ultimoDT?.requiereRepuestos &&
+    ultimoDT?.repuestosRequeridos &&
+    ultimoDT.repuestosRequeridos.length > 0
+      ? ultimoDT.repuestosRequeridos
+          .map((r) => `[${r.partNumber}] ${r.descripcion} (Cant.: ${r.cantidad})`)
+          .join('\n')
+      : osActiva?.piezasReemplazadas?.trim() || 'Ninguno';
+
+  const resultadoOperatividad =
+    osActiva?.pruebasQA?.resultadoOperatividad ||
+    informeActivo?.dictamenFinal ||
+    (osActiva?.pruebasQA?.superoQA ? 'REPARADO' : 'REPARADO');
+
+  const estadoEquipo =
+    resultadoOperatividad === 'INOPERATIVO' || caso.estado === 'INOPERATIVO'
+      ? 'INOPERATIVO (Equipo con daño irreversible o baja técnica)'
+      : resultadoOperatividad === 'OBSERVADO' || caso.estado === 'OBSERVADO'
+        ? 'OBSERVADO EN PRUEBAS (Requiere re-evaluación)'
+        : 'REPARADO / OPERATIVO (Control QA Conforme)';
+
+  const qaChecklist = osActiva?.pruebasQA?.checklist;
+  const qaChecksCount = qaChecklist
+    ? [
+        qaChecklist.encendidoPostBios,
+        qaChecklist.funcionamientoRepuesto,
+        qaChecklist.pruebasRedPuertos,
+        qaChecklist.limpiezaExterna,
+      ].filter(Boolean).length
+    : null;
+  const qaDetalleExtra = [
+    qaChecksCount !== null ? `Protocolo QA: ${qaChecksCount}/4 verificaciones superadas` : '',
+    osActiva?.pruebasQA?.observacionesQA?.trim() || '',
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
+
+  const controlQATexto = qaDetalleExtra ? `${estadoEquipo}\n${qaDetalleExtra}` : estadoEquipo;
+  const obsFinales = entrega?.observaciones?.trim() || 'Ninguna';
+
+  const specs: LabeledSectionSpec[] = [
+    { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 11.5 },
+    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 15 },
+    {
+      label: 'ACTIVIDADES\nREALIZADAS:',
+      content: actividadesTexto,
+      minHeight: 22,
+      elastic: true,
+    },
+    { label: 'CONTROL QA:', content: controlQATexto, minHeight: 12 },
+    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 11.5 },
+    { label: 'OBSERVACIONES:', content: obsFinales, minHeight: 11.5 },
+  ];
+
+  const measured = measureLabeledSections(doc, fontFamily, specs);
+  const { height: consH } = measureConsideracionesHeight(
+    doc,
+    fontFamily,
+    `CONSIDERACIONES: ${CONSIDERACIONES_INFORME_SERVICIO}`
+  );
+  const sigReserve = 23.5 + MUR_LAYOUT.boxGap;
+  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 40);
+
+  for (const sec of measured) {
+    curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
+  }
+
+  const receptorNom =
+    entrega?.receptorNombre || caso.cliente.contacto || caso.cliente.razonSocial;
+  const receptorDoc = entrega?.receptorDniRuc || caso.cliente.ruc;
+
+  curY = drawSignatureBoxes(
+    doc,
+    fontFamily,
+    curY,
+    {
+      leftTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
+      leftPrimary: esAlquiler ? receptorNom : `Receptor: ${receptorNom}`,
+      leftSecondary: !esAlquiler && receptorDoc ? `DNI / RUC: ${receptorDoc}` : undefined,
+      rightTitle: 'TÉCNICO RESPONSABLE',
+      rightPrimary: tecnicoNombre,
+      rightSecondary: 'MUR Tecnología S.A.C. - Laboratorio Técnico',
+    },
+    headerOpts
+  );
+
+  drawConsideracionesBox(
+    doc,
+    fontFamily,
+    curY,
+    'CONSIDERACIONES:',
+    CONSIDERACIONES_INFORME_SERVICIO,
+    headerOpts
+  );
+  drawMurFooterAllPages(doc, fontFamily);
+
+  if (!options?.skipSave) {
+    doc.save(
+      `InformeTecnico_${codigoInforme}_${codigoCaso}_${caso.equipo.numeroSerie || 'EQUIPO'}.pdf`
+    );
+  }
+
+  return doc;
 };
 
 // Alias para retrocompatibilidad

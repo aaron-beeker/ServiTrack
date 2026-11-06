@@ -4,6 +4,13 @@ import { ModeloEquipo } from '@/types';
 
 const MODELOS_PREDETERMINADOS: ModeloEquipo[] = [
   {
+    id: "mod-hp-pro400g9",
+    nombre: "Pro SFF 400 G9",
+    marca: "HP",
+    tipo: "Monitor",
+    partNumberSugerido: "64X66AA#ABM"
+  },
+  {
     id: "mod-hp-840g8",
     nombre: "EliteBook 840 G8",
     marca: "HP",

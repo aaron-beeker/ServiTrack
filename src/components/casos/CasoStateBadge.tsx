@@ -19,6 +19,21 @@ export function CasoStateBadge({ estado, size = "md" }: CasoStateBadgeProps) {
       className: "bg-amber-50 text-amber-800 border-amber-300",
       dot: "bg-amber-500"
     },
+    DIAGNOSTICADO: {
+      label: "DIAGNOSTICADO",
+      className: "bg-amber-50 text-amber-900 border-amber-400 font-bold",
+      dot: "bg-amber-600"
+    },
+    DIAGNOSTICADO_NO_APROBADO: {
+      label: "NO APROBADO",
+      className: "bg-rose-50 text-rose-800 border-rose-300",
+      dot: "bg-rose-500"
+    },
+    APROBADO_PARA_REPARACION: {
+      label: "APROBADO P/ REPARACIÓN",
+      className: "bg-sky-50 text-sky-800 border-sky-300 font-bold",
+      dot: "bg-sky-500"
+    },
     PENDIENTE_DE_APROBACION: {
       label: "PEND. APROBACIÓN",
       className: "bg-sky-50 text-sky-800 border-sky-300",
@@ -38,6 +53,16 @@ export function CasoStateBadge({ estado, size = "md" }: CasoStateBadgeProps) {
       label: "REPARADO / LISTO",
       className: "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold",
       dot: "bg-emerald-500"
+    },
+    OBSERVADO: {
+      label: "OBSERVADO (RE-EVALUACIÓN)",
+      className: "bg-amber-50 text-amber-800 border-amber-300 font-bold",
+      dot: "bg-amber-500 animate-pulse"
+    },
+    INOPERATIVO: {
+      label: "INOPERATIVO (IRREPARABLE)",
+      className: "bg-rose-50 text-rose-800 border-rose-300 font-bold",
+      dot: "bg-rose-600"
     },
     ENTREGADO: {
       label: "ENTREGADO",
@@ -81,7 +106,7 @@ export function CasoStateBadge({ estado, size = "md" }: CasoStateBadgeProps) {
   const textClass = size === "sm" ? "text-[10px] px-2 py-0.5" : "text-xs px-2.5 py-0.5"
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${textClass} ${current.className}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border font-semibold whitespace-nowrap shrink-0 ${textClass} ${current.className}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${current.dot}`} />
       {current.label}
     </span>
