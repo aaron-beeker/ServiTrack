@@ -502,8 +502,8 @@ export default function ExpedienteCasoPage() {
 
   const handleGuardarDiagnostico = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!dtHallazgos.trim() || !dtDetalle.trim()) {
-      toast.error("Completa la causa raíz y el diagnóstico detallado.")
+    if (!dtDetalle.trim() || !dtHallazgos.trim()) {
+      toast.error("Completa el diagnóstico detallado y la falla real.")
       return
     }
     if (dtRequiereRepuestos && dtRepuestosSeleccionados.length === 0) {
@@ -512,9 +512,10 @@ export default function ExpedienteCasoPage() {
     }
     try {
       const incActual = caso?.incidencias?.[caso.incidencias.length - 1] || caso?.incidencias?.[0]
+      const tecElegido = resolverNombreTecnico(dtTecnico || operadorNombre, usuarios)
       const nuevoDt = await registrarDiagnosticoTecnico(codigo, {
         incidenciaId: incActual?.id,
-        tecnicoResponsable: dtTecnico || operadorNombre,
+        tecnicoResponsable: tecElegido,
         tipoFalla: dtTipoFalla,
         hallazgos: dtHallazgos,
         diagnosticoDetallado: dtDetalle,
@@ -1841,12 +1842,12 @@ export default function ExpedienteCasoPage() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-slate-100">
                         <div>
-                          <span className="font-bold text-slate-700 block">Causa Raíz / Hallazgos:</span>
-                          <p className="text-slate-600 mt-0.5 leading-relaxed">{dtActual.hallazgos}</p>
-                        </div>
-                        <div>
                           <span className="font-bold text-slate-700 block">Diagnóstico Detallado:</span>
                           <p className="text-slate-600 mt-0.5 leading-relaxed">{dtActual.diagnosticoDetallado}</p>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-700 block">Falla Real:</span>
+                          <p className="text-slate-600 mt-0.5 leading-relaxed">{dtActual.hallazgos}</p>
                         </div>
                         {dtActual.danosFisicos && (
                           <div className="md:col-span-2 pt-1 border-t border-slate-200/60">
@@ -3767,12 +3768,23 @@ export default function ExpedienteCasoPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Técnico Evaluador</Label>
-                  <Input
+                  <Label className="text-xs font-semibold text-slate-800">Técnico Evaluador *</Label>
+                  <select
                     value={dtTecnico}
                     onChange={(e) => setDtTecnico(e.target.value)}
-                    className="text-xs h-8.5 bg-white"
-                  />
+                    className="w-full text-xs h-8.5 rounded-md border border-slate-200 px-2.5 bg-white text-slate-800 font-medium"
+                    required
+                  >
+                    <option value="" disabled>Seleccione al técnico evaluador...</option>
+                    {dtTecnico && !tecnicosDisponibles.includes(dtTecnico) && (
+                      <option value={dtTecnico}>{dtTecnico}</option>
+                    )}
+                    {tecnicosDisponibles.map((nombre) => (
+                      <option key={nombre} value={nombre}>
+                        {nombre}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -3787,24 +3799,24 @@ export default function ExpedienteCasoPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Causa Raíz / Hallazgos *</Label>
-                <Input
-                  value={dtHallazgos}
-                  onChange={(e) => setDtHallazgos(e.target.value)}
-                  placeholder="Ej. Cortocircuito en línea de 19V / Mosfet dañado"
-                  className="text-xs h-8.5 bg-white"
+                <Label className="text-xs font-semibold">Diagnóstico Detallado *</Label>
+                <textarea
+                  value={dtDetalle}
+                  onChange={(e) => setDtDetalle(e.target.value)}
+                  placeholder="Descripción técnica exhaustiva del problema y pruebas de descarte..."
+                  rows={2}
+                  className="w-full text-xs border border-slate-200 rounded-md p-2 bg-white resize-none"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Diagnóstico Detallado *</Label>
-                <textarea
-                  value={dtDetalle}
-                  onChange={(e) => setDtDetalle(e.target.value)}
-                  placeholder="Descripción técnica exhaustiva del problema..."
-                  rows={2}
-                  className="w-full text-xs border border-slate-200 rounded-md p-2 bg-white resize-none"
+                <Label className="text-xs font-semibold">Falla Real (Causa Raíz / Conclusión) *</Label>
+                <Input
+                  value={dtHallazgos}
+                  onChange={(e) => setDtHallazgos(e.target.value)}
+                  placeholder="Ej. Cortocircuito en línea de 19V / Mosfet dañado"
+                  className="text-xs h-8.5 bg-white"
                   required
                 />
               </div>

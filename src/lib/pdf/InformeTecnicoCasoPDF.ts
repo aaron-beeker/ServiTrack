@@ -86,19 +86,10 @@ export const generarInformeTecnicoCasoPDF = async (
     caso.incidencias?.[0]?.descripcion?.trim() ||
     'No especificada en el ingreso.';
 
-  const diagnosticoPartes: string[] = [];
-  if (dt.diagnosticoDetallado?.trim()) {
-    diagnosticoPartes.push(dt.diagnosticoDetallado.trim());
-  }
-  if (
-    dt.hallazgos?.trim() &&
-    (!dt.diagnosticoDetallado ||
-      !dt.diagnosticoDetallado.toLowerCase().includes(dt.hallazgos.trim().toLowerCase()))
-  ) {
-    diagnosticoPartes.push(`Causa raíz / Hallazgos: ${dt.hallazgos.trim()}`);
-  }
   const diagnosticoTexto =
-    diagnosticoPartes.join('\n') || 'Evaluación técnica de laboratorio completada.';
+    dt.diagnosticoDetallado?.trim() || 'Evaluación técnica de laboratorio completada.';
+  const fallaRealTexto =
+    dt.hallazgos?.trim() || 'Evaluación técnica sin daño irreparable.';
 
   let accionRecomendada =
     dt.solucionPropuesta?.trim() ||
@@ -124,7 +115,8 @@ export const generarInformeTecnicoCasoPDF = async (
 
   const specs: LabeledSectionSpec[] = [
     { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 13.5 },
-    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 36, elastic: true },
+    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 28, elastic: true },
+    { label: 'FALLA REAL:', content: fallaRealTexto, minHeight: 13.5 },
     { label: 'ACCIÓN\nRECOMENDADA:', content: accionRecomendada, minHeight: 14.5 },
     { label: 'OBSERVACIONES:', content: observacionesTexto, minHeight: 12.5 },
     { label: 'PIEZAS REQUERIDA:', content: piezasTexto, minHeight: 12.5 },
