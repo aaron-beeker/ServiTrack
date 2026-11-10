@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { Caso, ConstanciaAtencionSimple } from '@/types';
 import {
+  referenciaServicioCaso,
   createMurPdfDoc,
   distributeElasticHeight,
   drawClientAndDatesBox,
@@ -11,13 +12,13 @@ import {
   drawMurHeader,
   drawSignatureBoxes,
   formatDateMur,
-  formatTimeMur,
   KeyValueRow,
   LabeledSectionSpec,
   measureConsideracionesHeight,
   measureLabeledSections,
   MUR_LAYOUT,
   MurHeaderOptions,
+  resolverNombreTecnico,
 } from './pdfTheme';
 
 const CONSIDERACIONES_CONSTANCIA =
@@ -44,8 +45,11 @@ export const generarConstanciaAtencionPDF = async (
   const codigoInc = incAsociada?.codigoINC || constancia.incidenciaId || 'INC-001';
 
   const metaParts = [`Expediente: ${codigoCaso}`, `Incidencia: ${codigoInc}`];
-  if (caso.contratoAlquiler?.trim()) {
-    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
+  if (constancia.ticketItop?.trim()) {
+    metaParts.push(`Ticket iTop: ${constancia.ticketItop.trim()}`);
+  }
+  if (referenciaServicioCaso(caso)) {
+    metaParts.push(referenciaServicioCaso(caso));
   }
 
   const headerOpts: MurHeaderOptions = {
@@ -56,23 +60,25 @@ export const generarConstanciaAtencionPDF = async (
 
   let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
-  const fechaIngresoRaw = incAsociada?.fecha || caso.fechaApertura || constancia.fecha;
-  const fechaSalidaRaw = constancia.fecha || new Date().toISOString();
+  const fechaIngresoRaw =
+    constancia.fechaIngreso || incAsociada?.fecha || caso.fechaApertura || constancia.fecha;
+  const fechaSalidaRaw =
+    constancia.fechaSalida || constancia.fecha || new Date().toISOString();
 
   const fIn = formatDateMur(fechaIngresoRaw);
-  const hIn = formatTimeMur(fechaIngresoRaw);
   const fOut = formatDateMur(fechaSalidaRaw);
-  const hOut = formatTimeMur(fechaSalidaRaw);
+
+  const tecnicoNombre =
+    resolverNombreTecnico(constancia.tecnicoResponsable, undefined, constancia.tecnicoId) ||
+    'Soporte MUR';
 
   const rightRows: KeyValueRow[] = [
-    { label: 'EXPEDIENTE:', value: `${codigoCaso} (${codigoInc})` },
-    { label: 'FECHA DE INGRESO:', value: hIn ? `${fIn} (${hIn})` : fIn },
-    { label: 'FECHA DE SALIDA:', value: hOut ? `${fOut} (${hOut})` : fOut },
-    { label: 'TÉCNICO EJECUTOR:', value: constancia.tecnicoResponsable || 'Soporte MUR' },
+    { label: 'FECHA DE INGRESO:', value: fIn },
+    { label: 'HORA DE INGRESO:', value: '', blankTimeBox: true },
+    { label: 'FECHA SALIDA:', value: fOut },
+    { label: 'HORA DE SALIDA:', value: '', blankTimeBox: true },
+    { label: 'TÉCNICO EJECUTOR:', value: tecnicoNombre },
   ];
-  if (constancia.ticketItop?.trim()) {
-    rightRows.push({ label: 'TICKET iTOP:', value: constancia.ticketItop.trim() });
-  }
 
   curY = drawClientAndDatesBox(doc, fontFamily, curY, caso.cliente, rightRows);
   curY = drawEquipmentBox(doc, fontFamily, curY, caso.equipo);
@@ -121,7 +127,7 @@ export const generarConstanciaAtencionPDF = async (
     curY,
     {
       leftTitle: 'TÉCNICO EJECUTOR',
-      leftPrimary: constancia.tecnicoResponsable || 'Especialista Técnico',
+      leftPrimary: tecnicoNombre,
       leftSecondary: 'MUR Tecnología S.A.C.',
       rightTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
       rightPrimary: caso.cliente.contacto || caso.cliente.razonSocial,

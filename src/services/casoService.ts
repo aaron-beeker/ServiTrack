@@ -27,8 +27,10 @@ import {
   TipoOrdenServicio,
   RepuestoItem,
   OrdenServicio,
-  DatosIngresoCaso
+  DatosIngresoCaso,
+  TipoContratacion
 } from '@/types';
+import { getUsuariosSistema, resolverUsuarioTecnico } from '@/services/usuarioService';
 
 const COLECCION_CASOS = 'casos';
 const COLECCION_ORDENES = 'ordenes_servicio';
@@ -112,11 +114,14 @@ export const normalizarCasoLeido = (rawData: Record<string, any>, docId: string)
   const diagnosticos: DiagnosticoTecnicoCaso[] = diagnosticosRaw.map((dt, idx) => {
     const codigoDT = dt.codigoDT || dt.id || `DT-${(idx + 1).toString().padStart(6, '0')}`;
     const incAsociada = dt.incidenciaId || incidencias[Math.min(idx, Math.max(0, incidencias.length - 1))]?.id || primeraIncId;
+    const tecInfo = resolverUsuarioTecnico(dt.tecnicoResponsable, undefined, dt.tecnicoId);
     return {
       ...dt,
       id: dt.id || codigoDT,
       codigoDT,
       codigoCaso,
+      ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+      tecnicoResponsable: tecInfo.nombreCompleto,
       ...(incAsociada ? { incidenciaId: incAsociada } : {})
     };
   });
@@ -137,12 +142,15 @@ export const normalizarCasoLeido = (rawData: Record<string, any>, docId: string)
     const infAsociado =
       os.informeTecnicoId ||
       informesRaw.find(it => it.ordenServicioId === codigoOS || it.ordenServicioId === os.id)?.codigoInforme;
+    const tecInfo = resolverUsuarioTecnico(os.tecnicoAsignado, undefined, os.tecnicoId);
 
     return {
       ...os,
       id: os.id || codigoOS,
       codigoOS,
       codigoCaso,
+      ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+      tecnicoAsignado: tecInfo.nombreCompleto,
       ...(incAsociada ? { incidenciaId: incAsociada } : {}),
       ...(dtAsociado ? { diagnosticoId: dtAsociado.codigoDT } : os.diagnosticoId ? { diagnosticoId: os.diagnosticoId } : {}),
       ...(infAsociado ? { informeTecnicoId: infAsociado } : {})
@@ -154,11 +162,14 @@ export const normalizarCasoLeido = (rawData: Record<string, any>, docId: string)
     const osAsociada =
       ordenesServicio.find(o => o.codigoOS === it.ordenServicioId || o.id === it.ordenServicioId) ||
       ordenesServicio[Math.min(idx, Math.max(0, ordenesServicio.length - 1))];
+    const tecInfo = resolverUsuarioTecnico(it.tecnicoResponsable, undefined, it.tecnicoId || osAsociada?.tecnicoId);
     return {
       ...it,
       id: it.id || codigoInforme,
       codigoInforme,
       codigoCaso,
+      ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+      tecnicoResponsable: tecInfo.nombreCompleto,
       incidenciaId: it.incidenciaId || osAsociada?.incidenciaId || primeraIncId,
       diagnosticoId: it.diagnosticoId || osAsociada?.diagnosticoId || diagnosticos[0]?.codigoDT,
       ordenServicioId: it.ordenServicioId || osAsociada?.codigoOS
@@ -169,11 +180,14 @@ export const normalizarCasoLeido = (rawData: Record<string, any>, docId: string)
   const constancias: ConstanciaAtencionSimple[] = constanciasRaw.map((cst, idx) => {
     const codigoConstancia = cst.codigoConstancia || cst.id || `CA-${(idx + 1).toString().padStart(6, '0')}`;
     const incAsociada = cst.incidenciaId || incidencias[Math.min(idx, Math.max(0, incidencias.length - 1))]?.id || primeraIncId;
+    const tecInfo = resolverUsuarioTecnico(cst.tecnicoResponsable, undefined, cst.tecnicoId);
     return {
       ...cst,
       id: cst.id || codigoConstancia,
       codigoConstancia,
       codigoCaso,
+      ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+      tecnicoResponsable: tecInfo.nombreCompleto,
       ...(incAsociada ? { incidenciaId: incAsociada } : {})
     };
   });
@@ -363,6 +377,9 @@ export const crearNuevoCaso = async (params: {
   equipo: EquipoOrden;
   origen: OrigenIncidencia;
   contratoAlquiler?: string;
+  servicioId?: string;
+  tipoContratacion?: TipoContratacion;
+  ordenServicioCliente?: string;
   responsableApertura: string;
   incidenciaInicial: {
     descripcion: string;
@@ -429,6 +446,9 @@ export const crearNuevoCaso = async (params: {
       correo: params.cliente.correo?.trim() || ''
     },
     contratoAlquiler: params.contratoAlquiler?.trim() || '',
+    ...(params.servicioId ? { servicioId: params.servicioId } : {}),
+    ...(params.tipoContratacion ? { tipoContratacion: params.tipoContratacion } : {}),
+    ...(params.ordenServicioCliente?.trim() ? { ordenServicioCliente: params.ordenServicioCliente.trim() } : {}),
     equipo: {
       tipoEquipo: params.equipo.tipoEquipo.trim(),
       marca: params.equipo.marca.trim(),
@@ -762,11 +782,19 @@ export const registrarAtencionSimple = async (
     ticketItop?: string;
     observaciones?: string;
     tecnicoResponsable: string;
+    tecnicoId?: string;
+    fechaIngreso?: string;
+    horaIngreso?: string;
+    fechaSalida?: string;
+    horaSalida?: string;
     firmaReceptor?: string;
   }
 ): Promise<ConstanciaAtencionSimple> => {
   const caso = await getCasoByCodigo(codigoCaso);
   if (!caso) throw new Error(`Caso ${codigoCaso} no encontrado.`);
+
+  const usuarios = await getUsuariosSistema().catch(() => []);
+  const tecInfo = resolverUsuarioTecnico(params.tecnicoResponsable, usuarios, params.tecnicoId);
 
   const ahora = new Date().toISOString();
   const constId = await generarSiguienteCodigoConstancia();
@@ -777,18 +805,29 @@ export const registrarAtencionSimple = async (
     caso.incidencias?.[caso.incidencias.length - 1]?.id ||
     null;
 
+  const incRef =
+    caso.incidencias?.find(i => i.id === idIncidenciaAsociada) ||
+    caso.incidencias?.[caso.incidencias.length - 1] ||
+    caso.incidencias?.[0];
+
   const motivoFinal = params.motivoSoporte?.trim()
-    || caso.incidencias?.find(i => i.id === idIncidenciaAsociada)?.descripcion
-    || caso.incidencias?.[caso.incidencias.length - 1]?.descripcion
-    || caso.incidencias?.[0]?.descripcion
+    || incRef?.descripcion
     || 'Soporte menor / mantenimiento preventivo';
+
+  const fechaRefISO = incRef?.fecha || caso.fechaApertura || ahora;
+  const fechaRefYMD = fechaRefISO.slice(0, 10);
 
   const nuevaConstancia: ConstanciaAtencionSimple = {
     id: constId,
     codigoConstancia: constId,
     codigoCaso: caso.codigoCaso,
     fecha: ahora,
-    tecnicoResponsable: params.tecnicoResponsable,
+    fechaIngreso: params.fechaIngreso?.trim() || fechaRefYMD,
+    horaIngreso: params.horaIngreso?.trim() || '',
+    fechaSalida: params.fechaSalida?.trim() || fechaRefYMD,
+    horaSalida: params.horaSalida?.trim() || '',
+    ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+    tecnicoResponsable: tecInfo.nombreCompleto,
     motivoSoporte: motivoFinal,
     fallaReal: params.fallaReal?.trim() || undefined,
     actividadesRealizadas: params.actividadesRealizadas.trim(),
@@ -811,7 +850,7 @@ export const registrarAtencionSimple = async (
   const nuevaActividad: ActividadHistorial = {
     id: `ACT-${Date.now()}`,
     fecha: ahora,
-    autor: params.tecnicoResponsable,
+    autor: tecInfo.nombreCompleto,
     tipo: 'ATENCION_SIMPLE',
     titulo: `Constancia de Atención ${constId} (${caso.codigoCaso})`,
     detalle: `Soporte menor [${idIncidenciaAsociada || 'INC-001'}]: ${motivoFinal}. Resultado: ${params.resultado}${params.ticketItop ? ` • Ticket iTop: ${params.ticketItop}` : ''}.`,
@@ -837,6 +876,88 @@ export const registrarAtencionSimple = async (
   }
 
   return nuevaConstancia;
+};
+
+/**
+ * Permite actualizar manualmente la fecha/hora de ingreso y salida, técnico o detalles
+ * de una Constancia de Atención ya emitida en el expediente.
+ */
+export const actualizarConstanciaAtencion = async (
+  codigoCaso: string,
+  constanciaId: string,
+  params: {
+    fechaIngreso?: string;
+    horaIngreso?: string;
+    fechaSalida?: string;
+    horaSalida?: string;
+    ticketItop?: string;
+    fallaReal?: string;
+    actividadesRealizadas?: string;
+    resultado?: string;
+    observaciones?: string;
+    tecnicoResponsable?: string;
+    tecnicoId?: string;
+  }
+): Promise<ConstanciaAtencionSimple> => {
+  const caso = await getCasoByCodigo(codigoCaso);
+  if (!caso) throw new Error(`Caso ${codigoCaso} no encontrado.`);
+
+  const usuarios = await getUsuariosSistema().catch(() => []);
+  const ahora = new Date().toISOString();
+  let constanciaActualizada: ConstanciaAtencionSimple | null = null;
+
+  const constanciasNuevas = (caso.constancias || []).map((cst) => {
+    if (cst.id === constanciaId || cst.codigoConstancia === constanciaId) {
+      const tecInfo = resolverUsuarioTecnico(
+        params.tecnicoResponsable ?? cst.tecnicoResponsable,
+        usuarios,
+        params.tecnicoId ?? cst.tecnicoId
+      );
+      const updated: ConstanciaAtencionSimple = {
+        ...cst,
+        codigoCaso: caso.codigoCaso,
+        fechaIngreso: params.fechaIngreso !== undefined ? params.fechaIngreso.trim() : cst.fechaIngreso,
+        horaIngreso: params.horaIngreso !== undefined ? params.horaIngreso.trim() : cst.horaIngreso,
+        fechaSalida: params.fechaSalida !== undefined ? params.fechaSalida.trim() : cst.fechaSalida,
+        horaSalida: params.horaSalida !== undefined ? params.horaSalida.trim() : cst.horaSalida,
+        ticketItop: params.ticketItop !== undefined ? params.ticketItop.trim() : cst.ticketItop,
+        fallaReal: params.fallaReal !== undefined ? (params.fallaReal.trim() || undefined) : cst.fallaReal,
+        actividadesRealizadas:
+          params.actividadesRealizadas !== undefined
+            ? params.actividadesRealizadas.trim()
+            : cst.actividadesRealizadas,
+        resultado: params.resultado !== undefined ? params.resultado.trim() : cst.resultado,
+        observaciones:
+          params.observaciones !== undefined
+            ? (params.observaciones.trim() || undefined)
+            : cst.observaciones,
+        ...(tecInfo.tecnicoId ? { tecnicoId: tecInfo.tecnicoId } : {}),
+        tecnicoResponsable: tecInfo.nombreCompleto
+      };
+      constanciaActualizada = updated;
+      return updated;
+    }
+    return cst;
+  });
+
+  if (!constanciaActualizada) {
+    throw new Error(`Constancia ${constanciaId} no encontrada en el expediente ${caso.codigoCaso}.`);
+  }
+
+  const docRef = doc(db, COLECCION_CASOS, caso.id);
+  await updateDoc(docRef, limpiarUndefined({
+    constancias: constanciasNuevas,
+    actualizadoEl: ahora
+  }));
+
+  try {
+    const constSubRef = doc(db, `${COLECCION_CASOS}/${caso.id}/constancias`, (constanciaActualizada as ConstanciaAtencionSimple).id);
+    await setDoc(constSubRef, limpiarUndefined(constanciaActualizada), { merge: true });
+  } catch (err) {
+    console.warn('Subcolección constancias actualización:', err);
+  }
+
+  return constanciaActualizada;
 };
 
 /**
@@ -1718,9 +1839,10 @@ export const repararYOrdenarTrazabilidadCasos = async (): Promise<{
   informesGenerados: number;
 }> => {
   try {
-    const [casosSnap, ordenesSnap] = await Promise.all([
+    const [casosSnap, ordenesSnap, usuariosLista] = await Promise.all([
       getDocs(collection(db, COLECCION_CASOS)),
-      getDocs(collection(db, COLECCION_ORDENES))
+      getDocs(collection(db, COLECCION_ORDENES)),
+      getUsuariosSistema().catch(() => [])
     ]);
 
     if (casosSnap.empty) {
@@ -1922,12 +2044,15 @@ export const repararYOrdenarTrazabilidadCasos = async (): Promise<{
           (rawIncRef && incidenciasLimpias.some(i => i.id === rawIncRef) ? rawIncRef : undefined) ||
           incidenciasLimpias[Math.min(idx, incidenciasLimpias.length - 1)]?.id ||
           primeraIncId;
+        const tecDt = resolverUsuarioTecnico(dt.tecnicoResponsable, usuariosLista, dt.tecnicoId);
 
         return {
           ...dt,
           id: nuevoCodigoDT,
           codigoDT: nuevoCodigoDT,
           codigoCaso,
+          ...(tecDt.tecnicoId ? { tecnicoId: tecDt.tecnicoId } : {}),
+          tecnicoResponsable: tecDt.nombreCompleto,
           incidenciaId: incAsociada
         };
       });
@@ -1959,13 +2084,22 @@ export const repararYOrdenarTrazabilidadCasos = async (): Promise<{
           (rawIncRef && incidenciasLimpias.some(i => i.id === rawIncRef) ? rawIncRef : undefined) ||
           incidenciasLimpias[Math.min(idx, incidenciasLimpias.length - 1)]?.id ||
           primeraIncId;
+        const incObj = incidenciasLimpias.find(i => i.id === incAsociada) || incidenciasLimpias[0];
+        const fechaRefYMD = (incObj?.fecha || cst.fecha || fechaBase).slice(0, 10);
+        const tecCst = resolverUsuarioTecnico(cst.tecnicoResponsable, usuariosLista, cst.tecnicoId);
 
         return {
           ...cst,
           id: nuevoCodigoCA,
           codigoConstancia: nuevoCodigoCA,
           codigoCaso,
-          incidenciaId: incAsociada
+          incidenciaId: incAsociada,
+          fechaIngreso: cst.fechaIngreso || fechaRefYMD,
+          horaIngreso: cst.horaIngreso || '',
+          fechaSalida: cst.fechaSalida || (cst.fecha ? cst.fecha.slice(0, 10) : fechaRefYMD),
+          horaSalida: cst.horaSalida || '',
+          ...(tecCst.tecnicoId ? { tecnicoId: tecCst.tecnicoId } : {}),
+          tecnicoResponsable: tecCst.nombreCompleto
         };
       });
 
@@ -2010,12 +2144,15 @@ export const repararYOrdenarTrazabilidadCasos = async (): Promise<{
           dtAsociado?.incidenciaId ||
           incidenciasLimpias[Math.min(idx, incidenciasLimpias.length - 1)]?.id ||
           primeraIncId;
+        const tecOs = resolverUsuarioTecnico(os.tecnicoAsignado, usuariosLista, os.tecnicoId);
 
         return {
           ...os,
           id: nuevoCodigoOS,
           codigoOS: nuevoCodigoOS,
           codigoCaso,
+          ...(tecOs.tecnicoId ? { tecnicoId: tecOs.tecnicoId } : {}),
+          tecnicoAsignado: tecOs.nombreCompleto,
           incidenciaId: incAsociada,
           ...(dtAsociado ? { diagnosticoId: dtAsociado.codigoDT } : {})
         };
@@ -2059,12 +2196,19 @@ export const repararYOrdenarTrazabilidadCasos = async (): Promise<{
           osAsociada?.incidenciaId ||
           dtAsociado?.incidenciaId ||
           primeraIncId;
+        const tecIt = resolverUsuarioTecnico(
+          it.tecnicoResponsable,
+          usuariosLista,
+          it.tecnicoId || osAsociada?.tecnicoId || dtAsociado?.tecnicoId
+        );
 
         return {
           ...it,
           id: nuevoCodigoIT,
           codigoInforme: nuevoCodigoIT,
           codigoCaso,
+          ...(tecIt.tecnicoId ? { tecnicoId: tecIt.tecnicoId } : {}),
+          tecnicoResponsable: tecIt.nombreCompleto,
           incidenciaId: incAsociada,
           ...(dtAsociado ? { diagnosticoId: dtAsociado.codigoDT } : {}),
           ...(osAsociada ? { ordenServicioId: osAsociada.codigoOS } : {})

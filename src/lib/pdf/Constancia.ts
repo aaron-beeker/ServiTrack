@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { Caso, InformeTecnicoCaso, OrdenServicio } from '@/types';
 import {
+  referenciaServicioCaso,
   createMurPdfDoc,
   distributeElasticHeight,
   drawClientAndDatesBox,
@@ -9,7 +10,6 @@ import {
   drawMeasuredSection,
   drawMurFooterAllPages,
   drawMurHeader,
-  drawSignatureBoxes,
   formatDateMur,
   formatTimeMur,
   KeyValueRow,
@@ -18,6 +18,7 @@ import {
   measureLabeledSections,
   MUR_LAYOUT,
   MurHeaderOptions,
+  resolverNombreTecnico,
 } from './pdfTheme';
 
 const CONSIDERACIONES_INFORME_SERVICIO =
@@ -28,7 +29,7 @@ const CONSIDERACIONES_INFORME_SERVICIO =
  */
 export const generarInformeTecnico = async (
   orden: OrdenServicio,
-  esAlquilerParam?: boolean,
+  _esAlquilerParam?: boolean,
   options?: { skipSave?: boolean }
 ): Promise<jsPDF> => {
   const { doc, fontFamily } = await createMurPdfDoc();
@@ -41,12 +42,15 @@ export const generarInformeTecnico = async (
 
   let curY = drawMurHeader(doc, fontFamily, headerOpts);
 
+  const tecnicoOrden =
+    resolverNombreTecnico(orden.intervencion.tecnicoAsignado) || 'Especialista de Taller';
+
   const rightRows: KeyValueRow[] = [
     { label: 'FECHA DE INGRESO:', value: formatDateMur(orden.ingreso.fechaIngreso) },
     { label: 'FECHA DE ENTREGA:', value: formatDateMur(orden.cierre.fechaEntrega, 'En proceso') },
     {
       label: 'TÉCNICO EJECUTOR:',
-      value: orden.intervencion.tecnicoAsignado || 'Especialista de Taller',
+      value: tecnicoOrden,
     },
     { label: 'HORAS-HOMBRE:', value: `${orden.intervencion.horasHombre || 1} h` },
   ];
@@ -69,29 +73,29 @@ export const generarInformeTecnico = async (
       : 'Observado / No Conforme';
 
   const specs: LabeledSectionSpec[] = [
-    { label: 'FALLA REPORTADA:', content: orden.ingreso.fallaReportada, minHeight: 12 },
+    { label: 'FALLA REPORTADA:', content: orden.ingreso.fallaReportada, minHeight: 13 },
     {
       label: 'DIAGNÓSTICO:',
       content:
         orden.diagnostico.diagnosticoDetallado || 'Evaluación de hardware y software completada.',
-      minHeight: 16,
+      minHeight: 18,
     },
     {
       label: 'ACTIVIDADES\nREALIZADAS:',
       content:
         orden.intervencion.actividadesRealizadas ||
         'Servicio técnico especializado y pruebas integrales de operatividad.',
-      minHeight: 24,
+      minHeight: 30,
       elastic: true,
     },
-    { label: 'CONTROL QA:', content: qaDictamen, minHeight: 11.5 },
-    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 11.5 },
+    { label: 'CONTROL QA:', content: qaDictamen, minHeight: 12 },
+    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 12 },
     {
       label: 'OBSERVACIONES:',
       content:
         orden.cierre.observacionesFinales ||
         'Equipo verificado con protocolo de encendido y funcionamiento conforme.',
-      minHeight: 11.5,
+      minHeight: 12,
     },
   ];
 
@@ -101,44 +105,11 @@ export const generarInformeTecnico = async (
     fontFamily,
     `CONSIDERACIONES: ${CONSIDERACIONES_INFORME_SERVICIO}`
   );
-  const sigReserve = 23.5 + MUR_LAYOUT.boxGap;
-  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 40);
+  distributeElasticHeight(curY, measured, consH + MUR_LAYOUT.boxGap, 50);
 
   for (const sec of measured) {
     curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
   }
-
-  const esAlquiler =
-    esAlquilerParam ??
-    Boolean(
-      orden.esAlquiler ||
-        orden.origen === 'ALQUILER' ||
-        Boolean(orden.contratoAlquiler?.trim()) ||
-        orden.ingreso?.origen === 'ALQUILER' ||
-        Boolean(orden.ingreso?.contratoAlquiler?.trim()) ||
-        orden.ingreso?.esAlquiler
-    );
-
-  const receptorNom =
-    orden.cierre.receptorNombre ||
-    orden.ingreso.cliente.contacto ||
-    orden.ingreso.cliente.razonSocial;
-  const receptorDoc = orden.cierre.receptorDniRuc || orden.ingreso.cliente.ruc;
-
-  curY = drawSignatureBoxes(
-    doc,
-    fontFamily,
-    curY,
-    {
-      leftTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
-      leftPrimary: esAlquiler ? receptorNom : `Receptor: ${receptorNom}`,
-      leftSecondary: !esAlquiler && receptorDoc ? `DNI / RUC: ${receptorDoc}` : undefined,
-      rightTitle: 'TÉCNICO RESPONSABLE',
-      rightPrimary: orden.intervencion.tecnicoAsignado || 'Especialista Técnico',
-      rightSecondary: 'MUR Tecnología S.A.C. - Laboratorio Técnico',
-    },
-    headerOpts
-  );
 
   drawConsideracionesBox(
     doc,
@@ -220,8 +191,8 @@ export const generarInformeTecnicoFinalCaso = async (
   if (osActiva?.codigoOS) {
     metaParts.push(`Orden: ${osActiva.codigoOS}`);
   }
-  if (caso.contratoAlquiler?.trim()) {
-    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
+  if (referenciaServicioCaso(caso)) {
+    metaParts.push(referenciaServicioCaso(caso));
   }
 
   const headerOpts: MurHeaderOptions = {
@@ -247,11 +218,15 @@ export const generarInformeTecnicoFinalCaso = async (
   const fOut = formatDateMur(fechaSalidaRaw);
   const hOut = formatTimeMur(fechaSalidaRaw);
 
-  const tecnicoNombre =
+  const rawTecnico =
     informeActivo?.tecnicoResponsable ||
     osActiva?.tecnicoAsignado ||
     ultimoDT?.tecnicoResponsable ||
     'Especialista de Taller';
+  const rawTecnicoId =
+    informeActivo?.tecnicoId || osActiva?.tecnicoId || ultimoDT?.tecnicoId;
+  const tecnicoNombre =
+    resolverNombreTecnico(rawTecnico, undefined, rawTecnicoId) || 'Especialista de Taller';
   const horasHombre =
     informeActivo?.horasHombre || osActiva?.horasHombreReales || osActiva?.horasHombre || 1;
 
@@ -328,17 +303,17 @@ export const generarInformeTecnicoFinalCaso = async (
   const obsFinales = entrega?.observaciones?.trim() || 'Ninguna';
 
   const specs: LabeledSectionSpec[] = [
-    { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 11.5 },
-    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 15 },
+    { label: 'FALLA REPORTADA:', content: fallaReportada, minHeight: 13 },
+    { label: 'DIAGNÓSTICO:', content: diagnosticoTexto, minHeight: 18 },
     {
       label: 'ACTIVIDADES\nREALIZADAS:',
       content: actividadesTexto,
-      minHeight: 22,
+      minHeight: 30,
       elastic: true,
     },
-    { label: 'CONTROL QA:', content: controlQATexto, minHeight: 12 },
-    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 11.5 },
-    { label: 'OBSERVACIONES:', content: obsFinales, minHeight: 11.5 },
+    { label: 'CONTROL QA:', content: controlQATexto, minHeight: 13 },
+    { label: 'PIEZAS / REPUESTOS:', content: repuestosInstalados, minHeight: 12 },
+    { label: 'OBSERVACIONES:', content: obsFinales, minHeight: 12 },
   ];
 
   const measured = measureLabeledSections(doc, fontFamily, specs);
@@ -347,31 +322,12 @@ export const generarInformeTecnicoFinalCaso = async (
     fontFamily,
     `CONSIDERACIONES: ${CONSIDERACIONES_INFORME_SERVICIO}`
   );
-  const sigReserve = 23.5 + MUR_LAYOUT.boxGap;
-  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 40);
+  // Sin cajas de firma en el Informe Técnico Final (solo se firman las Constancias de Atención)
+  distributeElasticHeight(curY, measured, consH + MUR_LAYOUT.boxGap, 50);
 
   for (const sec of measured) {
     curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
   }
-
-  const receptorNom =
-    entrega?.receptorNombre || caso.cliente.contacto || caso.cliente.razonSocial;
-  const receptorDoc = entrega?.receptorDniRuc || caso.cliente.ruc;
-
-  curY = drawSignatureBoxes(
-    doc,
-    fontFamily,
-    curY,
-    {
-      leftTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DEL CLIENTE',
-      leftPrimary: esAlquiler ? receptorNom : `Receptor: ${receptorNom}`,
-      leftSecondary: !esAlquiler && receptorDoc ? `DNI / RUC: ${receptorDoc}` : undefined,
-      rightTitle: 'TÉCNICO RESPONSABLE',
-      rightPrimary: tecnicoNombre,
-      rightSecondary: 'MUR Tecnología S.A.C. - Laboratorio Técnico',
-    },
-    headerOpts
-  );
 
   drawConsideracionesBox(
     doc,

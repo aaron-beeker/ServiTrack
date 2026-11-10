@@ -26,7 +26,8 @@ import { MurLogo } from "@/components/brand/MurLogo"
 import { UserMenu } from "@/components/auth/UserMenu"
 import { useAuth } from "@/context/AuthContext"
 import { getAllClientes, createCliente, updateCliente, deleteCliente } from "@/services/clienteService"
-import { Cliente } from "@/types"
+import { Cliente, ContactoCliente, ServicioContrato } from "@/types"
+import { getAllServiciosCliente, etiquetaReferenciaServicio } from "@/services/servicioService"
 import { toast } from "sonner"
 
 export default function ClientesPage() {
@@ -44,16 +45,17 @@ export default function ClientesPage() {
   // Form State
   const [razonSocial, setRazonSocial] = useState("")
   const [ruc, setRuc] = useState("")
-  const [contacto, setContacto] = useState("")
-  const [telefono, setTelefono] = useState("")
-  const [correo, setCorreo] = useState("")
+  const [alias, setAlias] = useState("")
+  const [contactos, setContactos] = useState<ContactoCliente[]>([{ nombre: "", cargo: "", telefono: "", correo: "", principal: true }])
   const [direccion, setDireccion] = useState("")
+  const [servicios, setServicios] = useState<ServicioContrato[]>([])
 
   const cargarClientes = async () => {
     setLoading(true)
     try {
-      const data = await getAllClientes()
+      const [data, srv] = await Promise.all([getAllClientes(), getAllServiciosCliente()])
       setClientes(data)
+      setServicios(srv)
     } catch (err) {
       console.error("Error al cargar clientes:", err)
       toast.error("Error al consultar clientes.")
@@ -70,9 +72,8 @@ export default function ClientesPage() {
     setClienteEditando(null)
     setRazonSocial("")
     setRuc("")
-    setContacto("")
-    setTelefono("")
-    setCorreo("")
+    setAlias("")
+    setContactos([{ nombre: "", cargo: "", telefono: "", correo: "", principal: true }])
     setDireccion("")
     setModalOpen(true)
   }
@@ -81,9 +82,12 @@ export default function ClientesPage() {
     setClienteEditando(cli)
     setRazonSocial(cli.razonSocial)
     setRuc(cli.ruc)
-    setContacto(cli.contacto)
-    setTelefono(cli.telefono || "")
-    setCorreo(cli.correo || "")
+    setAlias(cli.alias || "")
+    setContactos(
+      cli.contactos && cli.contactos.length > 0
+        ? cli.contactos
+        : [{ nombre: cli.contacto || "", cargo: "", telefono: cli.telefono || "", correo: cli.correo || "", principal: true }]
+    )
     setDireccion(cli.direccion || "")
     setModalOpen(true)
   }
@@ -92,8 +96,8 @@ export default function ClientesPage() {
     e.preventDefault()
 
     const rucLimpio = ruc.trim()
-    if (!/^[0-9]{11}$/.test(rucLimpio)) {
-      toast.error("El RUC empresarial debe tener exactamente 11 dígitos numéricos.")
+    if (rucLimpio && !/^[0-9]{11}$/.test(rucLimpio)) {
+      toast.error("El RUC empresarial debe tener exactamente 11 dígitos numéricos (o déjelo vacío si aún no se tiene).")
       return
     }
 
@@ -102,14 +106,29 @@ export default function ClientesPage() {
       return
     }
 
-    if (!contacto.trim()) {
-      toast.error("El contacto responsable es obligatorio.")
+    const contactosLimpios = contactos
+      .map((c, i) => ({
+        nombre: c.nombre.trim(),
+        cargo: c.cargo?.trim() || "",
+        telefono: c.telefono?.trim() || "",
+        correo: c.correo?.trim() || "",
+        principal: i === 0
+      }))
+      .filter((c) => c.nombre)
+
+    const correoInvalido = contactosLimpios.find((c) => c.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.correo))
+    if (correoInvalido) {
+      toast.error(`Correo inválido para ${correoInvalido.nombre}.`)
       return
     }
 
-    if (correo.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
-      toast.error("Ingrese un correo electrónico corporativo válido.")
-      return
+    const principal = contactosLimpios[0]
+    const datosContacto = {
+      alias: alias.trim(),
+      contactos: contactosLimpios,
+      contacto: principal?.nombre || "",
+      telefono: principal?.telefono || "",
+      correo: principal?.correo || ""
     }
 
     setGuardando(true)
@@ -118,9 +137,7 @@ export default function ClientesPage() {
         await updateCliente(clienteEditando.id, {
           razonSocial: razonSocial.trim(),
           ruc: rucLimpio,
-          contacto: contacto.trim(),
-          telefono: telefono.trim(),
-          correo: correo.trim(),
+          ...datosContacto,
           direccion: direccion.trim()
         })
         toast.success("Cliente actualizado con éxito.")
@@ -128,9 +145,7 @@ export default function ClientesPage() {
         await createCliente({
           razonSocial: razonSocial.trim(),
           ruc: rucLimpio,
-          contacto: contacto.trim(),
-          telefono: telefono.trim(),
-          correo: correo.trim(),
+          ...datosContacto,
           direccion: direccion.trim()
         })
         toast.success("Cliente registrado con éxito en el catálogo.")
@@ -166,9 +181,12 @@ export default function ClientesPage() {
     if (!q) return true
     return (
       c.razonSocial.toLowerCase().includes(q) ||
+      (c.alias && c.alias.toLowerCase().includes(q)) ||
       c.ruc.includes(q) ||
-      c.contacto.toLowerCase().includes(q) ||
-      (c.correo && c.correo.toLowerCase().includes(q))
+      (c.contacto || "").toLowerCase().includes(q) ||
+      (c.contactos || []).some((k) => k.nombre.toLowerCase().includes(q) || (k.cargo || "").toLowerCase().includes(q)) ||
+      (c.correo && c.correo.toLowerCase().includes(q)) ||
+      servicios.some((s) => s.clienteId === c.id && (s.ordenServicioCliente === q || (s.numeroContrato || "").toLowerCase().includes(q)))
     )
   })
 
@@ -295,17 +313,23 @@ export default function ClientesPage() {
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                     <th className="py-3 px-4">Razón Social</th>
                     <th className="py-3 px-4">RUC</th>
-                    <th className="py-3 px-4">Contacto Responsable</th>
-                    <th className="py-3 px-4">Teléfono / Celular</th>
-                    <th className="py-3 px-4">Correo Electrónico</th>
+                    <th className="py-3 px-4">Contactos y Cargos</th>
+                    <th className="py-3 px-4">Servicios Contratados</th>
                     <th className="py-3 px-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {clientesFiltrados.map((cli) => (
-                    <tr key={cli.id || cli.ruc} className="hover:bg-slate-50/70 transition-colors">
+                  {clientesFiltrados.map((cli) => {
+                    const srvCli = servicios.filter((s) => s.clienteId === cli.id)
+                    const srvActivos = srvCli.filter((s) => s.estado === "ACTIVO")
+                    const lista = cli.contactos && cli.contactos.length > 0
+                      ? cli.contactos
+                      : cli.contacto ? [{ nombre: cli.contacto, cargo: "", telefono: cli.telefono, correo: cli.correo }] : []
+                    return (
+                    <tr key={cli.id || cli.ruc} className="hover:bg-slate-50/70 transition-colors align-top">
                       <td className="py-3.5 px-4 font-semibold text-slate-900">
                         {cli.razonSocial}
+                        {cli.alias && <span className="ml-1.5 text-[10px] font-mono text-slate-400">({cli.alias})</span>}
                         {cli.direccion && (
                           <span className="block text-[11px] text-slate-400 font-normal flex items-center gap-1 mt-0.5">
                             <MapPin className="w-3 h-3 text-slate-400" />
@@ -314,16 +338,34 @@ export default function ClientesPage() {
                         )}
                       </td>
                       <td className="py-3.5 px-4 font-mono font-semibold text-[#2369A1]">
-                        {cli.ruc}
+                        {cli.ruc || <span className="text-amber-600 font-sans text-[11px] font-medium">Pendiente</span>}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-700">
-                        {cli.contacto}
+                      <td className="py-3.5 px-4 text-slate-700 space-y-1">
+                        {lista.length === 0 && <span className="text-amber-600 text-[11px]">Sin contactos — completar</span>}
+                        {lista.map((k, i) => (
+                          <div key={i} className="leading-tight">
+                            <span className="font-medium">{k.nombre}</span>
+                            {k.cargo && <span className="text-slate-500"> · {k.cargo}</span>}
+                            <span className="block text-[10px] text-slate-400 font-mono">
+                              {[k.telefono, k.correo].filter(Boolean).join(" · ")}
+                            </span>
+                          </div>
+                        ))}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
-                        {cli.telefono || '—'}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 text-[11px]">
-                        {cli.correo || '—'}
+                      <td className="py-3.5 px-4 text-[11px] text-slate-600 space-y-0.5">
+                        {srvCli.length === 0 ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          <>
+                            <span className="font-semibold text-emerald-700">{srvActivos.length} activo(s)</span>
+                            <span className="text-slate-400"> / {srvCli.length} total</span>
+                            {srvActivos.map((s) => (
+                              <span key={s.id} className="block font-mono text-[10px] text-slate-600">
+                                {etiquetaReferenciaServicio(s)} · {s.objeto}
+                              </span>
+                            ))}
+                          </>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -344,7 +386,7 @@ export default function ClientesPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -355,7 +397,7 @@ export default function ClientesPage() {
 
       {/* Modal Crear / Editar Cliente */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[540px] bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl">
+        <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto bg-white border border-slate-200 text-slate-800 p-0 shadow-2xl rounded-2xl">
           <div className="p-6 pb-4 border-b border-slate-200 bg-white">
             <DialogHeader>
               <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -383,51 +425,80 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <Label htmlFor="cli-ruc" className="text-xs text-slate-700">RUC (11 dígitos) *</Label>
+                <Label htmlFor="cli-ruc" className="text-xs text-slate-700">RUC (11 dígitos)</Label>
                 <Input
                   id="cli-ruc"
-                  placeholder="Ej. 20602743960"
+                  placeholder="Ej. 20602743960 (pendiente si no se tiene)"
                   maxLength={11}
                   value={ruc}
                   onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
                   className="mt-1 bg-white border-slate-300 text-xs font-mono"
-                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="cli-contacto" className="text-xs text-slate-700">Contacto Responsable *</Label>
+                <Label htmlFor="cli-alias" className="text-xs text-slate-700">Nombre corto (control de servicios)</Label>
                 <Input
-                  id="cli-contacto"
-                  placeholder="Ej. Leonidas Cisneros"
-                  value={contacto}
-                  onChange={(e) => setContacto(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-xs"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="cli-tel" className="text-xs text-slate-700">Teléfono / Celular</Label>
-                <Input
-                  id="cli-tel"
-                  placeholder="Ej. 992011409"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
+                  id="cli-alias"
+                  placeholder="Ej. DIRIS LIMA CENTRO"
+                  value={alias}
+                  onChange={(e) => setAlias(e.target.value)}
                   className="mt-1 bg-white border-slate-300 text-xs"
                 />
               </div>
 
-              <div>
-                <Label htmlFor="cli-correo" className="text-xs text-slate-700">Correo Electrónico</Label>
-                <Input
-                  id="cli-correo"
-                  type="email"
-                  placeholder="Ej. contacto@cliente.com"
-                  value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-xs"
-                />
+              <div className="sm:col-span-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-slate-700">Contactos y cargos (el primero es el principal)</Label>
+                  <button
+                    type="button"
+                    onClick={() => setContactos([...contactos, { nombre: "", cargo: "", telefono: "", correo: "" }])}
+                    className="text-[11px] font-semibold text-[#2369A1] hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Agregar contacto
+                  </button>
+                </div>
+                {contactos.map((c, i) => (
+                  <div key={i} className="grid grid-cols-2 gap-2 p-2 border border-slate-200 rounded-lg bg-slate-50/50 relative">
+                    <Input
+                      placeholder="Nombre y apellidos"
+                      value={c.nombre}
+                      onChange={(e) => setContactos(contactos.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))}
+                      className="bg-white border-slate-300 text-xs"
+                    />
+                    <Input
+                      placeholder="Cargo (Ej. Jefe de TI)"
+                      value={c.cargo || ""}
+                      onChange={(e) => setContactos(contactos.map((x, j) => (j === i ? { ...x, cargo: e.target.value } : x)))}
+                      className="bg-white border-slate-300 text-xs"
+                    />
+                    <Input
+                      placeholder="Teléfono / Celular"
+                      value={c.telefono || ""}
+                      onChange={(e) => setContactos(contactos.map((x, j) => (j === i ? { ...x, telefono: e.target.value } : x)))}
+                      className="bg-white border-slate-300 text-xs"
+                    />
+                    <div className="flex gap-1">
+                      <Input
+                        type="email"
+                        placeholder="Correo"
+                        value={c.correo || ""}
+                        onChange={(e) => setContactos(contactos.map((x, j) => (j === i ? { ...x, correo: e.target.value } : x)))}
+                        className="bg-white border-slate-300 text-xs"
+                      />
+                      {contactos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setContactos(contactos.filter((_, j) => j !== i))}
+                          className="p-1.5 text-slate-400 hover:text-rose-600"
+                          title="Quitar contacto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="sm:col-span-2">

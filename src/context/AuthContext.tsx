@@ -11,7 +11,7 @@ import {
 } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { UsuarioSistema, RolUsuario } from "@/types"
-import { syncUsuarioGoogle, DEFAULT_USUARIOS } from "@/services/usuarioService"
+import { syncUsuarioGoogle, DEFAULT_USUARIOS, getUsuariosSistema, resolverNombreTecnico } from "@/services/usuarioService"
 import { toast } from "sonner"
 
 interface AuthContextType {
@@ -69,7 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const stored = localStorage.getItem(STORAGE_KEY_DEMO)
           if (stored) {
             const demoUser = JSON.parse(stored) as UsuarioSistema
-            setPerfil(demoUser)
+            const syncedName = resolverNombreTecnico(demoUser.nombreCompleto, undefined, demoUser.id)
+            const syncedDemo = { ...demoUser, nombreCompleto: syncedName }
+            setPerfil(syncedDemo)
+            getUsuariosSistema().then((lista) => {
+              const liveName = resolverNombreTecnico(demoUser.nombreCompleto, lista, demoUser.id)
+              if (liveName !== syncedDemo.nombreCompleto) {
+                const updated = { ...syncedDemo, nombreCompleto: liveName }
+                setPerfil(updated)
+                localStorage.setItem(STORAGE_KEY_DEMO, JSON.stringify(updated))
+              }
+            }).catch(() => {})
           } else {
             setPerfil(null)
           }
@@ -148,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       demo = DEFAULT_USUARIOS.find(u => u.rol === rolDeseado) || {
         id: `demo-${rolDeseado.toLowerCase()}`,
-        nombreCompleto: rolDeseado === 'TECNICO' ? 'Kevin Quispe' : 'María Elena Torres',
+        nombreCompleto: rolDeseado === 'TECNICO' ? 'Kevin Ochoa' : 'María Elena Torres',
         correo: rolDeseado === 'TECNICO' ? 'kevin.soporte@murtecnologia.com' : 'ventas@murtecnologia.com',
         rol: rolDeseado,
         cargo: rolDeseado === 'TECNICO' ? 'Técnico de Laboratorio' : 'Asesora Comercial / Ventas',

@@ -1,4 +1,4 @@
-export type EstadoGeneral = 
+﻿export type EstadoGeneral = 
   | 'REGISTRADO' 
   | 'EN_DIAGNOSTICO' 
   | 'DIAGNOSTICADO' 
@@ -132,9 +132,40 @@ export interface UsuarioSistema {
 // Aliases para retrocompatibilidad
 export type Ticket = OrdenServicio;
 export type EstadoTicket = EstadoGeneral;
+export interface ContactoCliente {
+  nombre: string;
+  cargo?: string;
+  telefono?: string;
+  correo?: string;
+  principal?: boolean;
+}
+
+export type TipoContratacion = 'CONTRATO' | 'OS' | 'RESOLUCION';
+export type EstadoServicioContrato = 'ACTIVO' | 'FINALIZADO';
+
+/** Servicio contratado por un cliente (licitación / contrato / orden de servicio del cliente). */
+export interface ServicioContrato {
+  id: string; // SRV-01
+  clienteId: string; // id del documento en clientes
+  entidad: string; // Nombre corto tal como figura en el control de servicios
+  tipoContratacion: TipoContratacion;
+  numeroContrato?: string | null; // N° Contrato / Resolución del cliente
+  ordenServicioCliente?: string | null; // N° OS emitida por el CLIENTE (distinta de la OS-XXXXXX interna)
+  notaOrdenServicio?: string | null;
+  objeto: string;
+  fechaInicio: string; // YYYY-MM-DD
+  fechaFin: string; // YYYY-MM-DD
+  estado: EstadoServicioContrato;
+  montoTotal?: number | null;
+  montoMensual?: number | null;
+  comentarios?: string | null;
+}
+
 export interface Cliente extends ClienteOrden {
   id?: string;
   clienteId?: string;
+  alias?: string;
+  contactos?: ContactoCliente[];
   nombreContacto?: string;
   direccion?: string;
   creadoEl?: string;
@@ -225,6 +256,7 @@ export interface DiagnosticoTecnicoCaso {
   codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   incidenciaId?: string;
   fecha: string;
+  tecnicoId?: string; // Vínculo al usuario en colección `usuarios` (ej. "kevin.tecnico")
   tecnicoResponsable: string;
   tipoFalla: 'HARDWARE' | 'SOFTWARE' | 'OPERATIVO';
   hallazgos: string; // Causa raíz
@@ -260,6 +292,7 @@ export interface OrdenServicioTrabajo {
   diagnosticoId?: string;
   informeTecnicoId?: string; // Vínculo al Informe Técnico emitido (IT-XXXXXX)
   tipo: TipoOrdenServicio;
+  tecnicoId?: string; // Vínculo al usuario en colección `usuarios`
   tecnicoAsignado: string;
   actividades: string; // Actividades planificadas
   actividadesRealizadas?: string; // Actividades efectivamente ejecutadas en taller
@@ -290,6 +323,7 @@ export interface InformeTecnicoCaso {
   diagnosticoId?: string; // Vínculo al Diagnóstico Técnico (DT-XXXXXX)
   ordenServicioId?: string; // Vínculo a la Orden de Servicio (OS-XXXXXX)
   fechaEmision: string;
+  tecnicoId?: string; // Vínculo al usuario en colección `usuarios`
   tecnicoResponsable: string;
   dictamenFinal: 'REPARADO' | 'INOPERATIVO' | 'OBSERVADO';
   resumenDiagnostico?: string;
@@ -304,6 +338,11 @@ export interface ConstanciaAtencionSimple {
   codigoCaso?: string; // Vínculo explícito al Expediente Único (CASO-XXXXXX)
   incidenciaId?: string;
   fecha: string;
+  fechaIngreso?: string; // Fecha de ingreso manual para la constancia (YYYY-MM-DD o DD/MM/YYYY)
+  horaIngreso?: string; // Hora de inicio / ingreso manual del servicio (HH:mm)
+  fechaSalida?: string; // Fecha de salida manual para la constancia (YYYY-MM-DD o DD/MM/YYYY)
+  horaSalida?: string; // Hora de fin / salida manual del servicio (HH:mm)
+  tecnicoId?: string; // Vínculo al usuario en colección `usuarios` (ej. "kevin.tecnico")
   tecnicoResponsable: string;
   motivoSoporte: string; // Falla reportada por el cliente/usuario
   fallaReal?: string; // Falla real comprobada técnicamente
@@ -353,6 +392,9 @@ export interface Caso {
   origen: OrigenIncidencia; // TALLER | ALQUILER | RECLAMO_GARANTIA
   cliente: ClienteOrden;
   contratoAlquiler?: string; // Número o ref de contrato de alquiler si aplica
+  servicioId?: string; // SRV-XX vinculado del catálogo de servicios del cliente
+  tipoContratacion?: TipoContratacion;
+  ordenServicioCliente?: string; // N° OS del cliente (distinta de la OS interna de intervención)
   equipo: EquipoOrden;
   responsableApertura: string;
   fechaApertura: string;
@@ -389,3 +431,4 @@ export interface Caso {
   creadoEl: string;
   actualizadoEl: string;
 }
+

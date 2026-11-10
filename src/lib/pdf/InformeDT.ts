@@ -15,6 +15,7 @@ import {
   measureLabeledSections,
   MUR_LAYOUT,
   MurHeaderOptions,
+  resolverNombreTecnico,
 } from './pdfTheme';
 
 const CONSIDERACIONES_DT =
@@ -51,7 +52,7 @@ export const generarInformeDiagnostico = async (
     },
     {
       label: 'TÉCNICO EVALUADOR:',
-      value: orden.diagnostico.tecnicoDiagnostico || 'Laboratorio MUR',
+      value: resolverNombreTecnico(orden.diagnostico.tecnicoDiagnostico) || 'Laboratorio MUR',
     },
     { label: 'TIPIFICACIÓN:', value: orden.diagnostico.tipoFalla || 'PENDIENTE' },
   ];

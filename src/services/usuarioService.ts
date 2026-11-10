@@ -1,6 +1,14 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { UsuarioSistema, RolUsuario } from '@/types';
+import {
+  resolverUsuarioTecnico,
+  resolverNombreTecnico,
+  setCachedUsuariosSistema,
+  getCachedUsuariosSistema,
+} from '@/lib/pdf/pdfTheme';
+
+export { resolverUsuarioTecnico, resolverNombreTecnico };
 
 export const DEFAULT_USUARIOS: UsuarioSistema[] = [
   {
@@ -21,10 +29,10 @@ export const DEFAULT_USUARIOS: UsuarioSistema[] = [
   },
   {
     id: "kevin.tecnico",
-    nombreCompleto: "Kevin Quispe",
+    nombreCompleto: "Kevin Ochoa",
     correo: "kevin.soporte@murtecnologia.com",
     rol: "TECNICO",
-    cargo: "Técnico de Laboratorio y Taller",
+    cargo: "Técnico de Campo y Taller",
     activo: true
   },
   {
@@ -36,6 +44,25 @@ export const DEFAULT_USUARIOS: UsuarioSistema[] = [
     activo: true
   }
 ];
+
+const normalizarTextoUsuario = (val?: string | null): string =>
+  (val || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+
+const ALIAS_HISTORICOS_POR_USUARIO_ID: Record<string, string[]> = {
+  'kevin.tecnico': [
+    'kevin quispe',
+    'kebin quispe',
+    'kevin ochoa',
+    'kebin ochoa',
+    'kevin.tecnico',
+    'kevin.soporte@murtecnologia.com'
+  ]
+};
 
 export const getUsuariosSistema = async (): Promise<UsuarioSistema[]> => {
   try {
@@ -54,15 +81,21 @@ export const getUsuariosSistema = async (): Promise<UsuarioSistema[]> => {
         docs.unshift(DEFAULT_USUARIOS[0]);
       }
 
+      setCachedUsuariosSistema(docs);
       return docs;
     }
 
+    setCachedUsuariosSistema([...DEFAULT_USUARIOS]);
     return DEFAULT_USUARIOS;
   } catch (err) {
     console.warn('Advertencia al consultar usuarios en Firestore, usando usuarios base:', err);
-    return DEFAULT_USUARIOS;
+    return getCachedUsuariosSistema();
   }
 };
+
+if (typeof window !== 'undefined') {
+  void getUsuariosSistema();
+}
 
 export const getUsuarioPorCorreo = async (correo: string): Promise<UsuarioSistema | null> => {
   if (!correo) return null;
@@ -206,13 +239,192 @@ export const actualizarRolUsuario = async (id: string, nuevoRol: RolUsuario): Pr
   }
 };
 
+export const sincronizarNombreUsuarioEnExpedientes = async (
+  usuarioId: string,
+  nuevoNombre: string,
+  nombresAnteriores: string[] = []
+): Promise<number> => {
+  const nombreLimpio = nuevoNombre.trim();
+  if (!nombreLimpio) return 0;
+
+  const aliasesNorm = new Set<string>([
+    normalizarTextoUsuario(usuarioId),
+    ...(ALIAS_HISTORICOS_POR_USUARIO_ID[usuarioId] || []),
+    ...nombresAnteriores.map((n) => normalizarTextoUsuario(n))
+  ].filter(Boolean));
+
+  const coincideConUsuario = (nombreCampo?: string | null, tecIdCampo?: string | null): boolean => {
+    if (tecIdCampo && tecIdCampo.trim() === usuarioId) return true;
+    const norm = normalizarTextoUsuario(nombreCampo);
+    return Boolean(norm && aliasesNorm.has(norm));
+  };
+
+  let docsModificados = 0;
+
+  try {
+    const [casosSnap, ordenesSnap] = await Promise.all([
+      getDocs(collection(db, 'casos')),
+      getDocs(collection(db, 'ordenes_servicio'))
+    ]);
+
+    for (const d of casosSnap.docs) {
+      const data = d.data();
+      let cambio = false;
+
+      const constancias = Array.isArray(data.constancias)
+        ? data.constancias.map((cst: any) => {
+            if (coincideConUsuario(cst.tecnicoResponsable, cst.tecnicoId)) {
+              if (cst.tecnicoResponsable !== nombreLimpio || cst.tecnicoId !== usuarioId) {
+                cambio = true;
+                return { ...cst, tecnicoId: usuarioId, tecnicoResponsable: nombreLimpio };
+              }
+            }
+            return cst;
+          })
+        : data.constancias;
+
+      const diagnosticos = Array.isArray(data.diagnosticos)
+        ? data.diagnosticos.map((dt: any) => {
+            if (coincideConUsuario(dt.tecnicoResponsable, dt.tecnicoId)) {
+              if (dt.tecnicoResponsable !== nombreLimpio || dt.tecnicoId !== usuarioId) {
+                cambio = true;
+                return { ...dt, tecnicoId: usuarioId, tecnicoResponsable: nombreLimpio };
+              }
+            }
+            return dt;
+          })
+        : data.diagnosticos;
+
+      const ordenesServicio = Array.isArray(data.ordenesServicio)
+        ? data.ordenesServicio.map((os: any) => {
+            let osMod = os;
+            if (coincideConUsuario(os.tecnicoAsignado, os.tecnicoId)) {
+              if (os.tecnicoAsignado !== nombreLimpio || os.tecnicoId !== usuarioId) {
+                cambio = true;
+                osMod = { ...osMod, tecnicoId: usuarioId, tecnicoAsignado: nombreLimpio };
+              }
+            }
+            if (osMod.pruebasQA && coincideConUsuario(osMod.pruebasQA.tecnicoQA)) {
+              if (osMod.pruebasQA.tecnicoQA !== nombreLimpio) {
+                cambio = true;
+                osMod = {
+                  ...osMod,
+                  pruebasQA: { ...osMod.pruebasQA, tecnicoQA: nombreLimpio }
+                };
+              }
+            }
+            if (osMod.firmaDigitalTecnico && coincideConUsuario(osMod.firmaDigitalTecnico)) {
+              if (osMod.firmaDigitalTecnico !== nombreLimpio) {
+                cambio = true;
+                osMod = { ...osMod, firmaDigitalTecnico: nombreLimpio };
+              }
+            }
+            return osMod;
+          })
+        : data.ordenesServicio;
+
+      const informesTecnicos = Array.isArray(data.informesTecnicos)
+        ? data.informesTecnicos.map((it: any) => {
+            if (coincideConUsuario(it.tecnicoResponsable, it.tecnicoId)) {
+              if (it.tecnicoResponsable !== nombreLimpio || it.tecnicoId !== usuarioId) {
+                cambio = true;
+                return { ...it, tecnicoId: usuarioId, tecnicoResponsable: nombreLimpio };
+              }
+            }
+            return it;
+          })
+        : data.informesTecnicos;
+
+      let entrega = data.entrega;
+      if (entrega && coincideConUsuario(entrega.responsableEntrega)) {
+        if (entrega.responsableEntrega !== nombreLimpio) {
+          cambio = true;
+          entrega = { ...entrega, responsableEntrega: nombreLimpio };
+        }
+      }
+
+      let responsableApertura = data.responsableApertura;
+      if (coincideConUsuario(responsableApertura)) {
+        if (responsableApertura !== nombreLimpio) {
+          cambio = true;
+          responsableApertura = nombreLimpio;
+        }
+      }
+
+      const historial = Array.isArray(data.historial)
+        ? data.historial.map((h: any) => {
+            if (coincideConUsuario(h.autor)) {
+              if (h.autor !== nombreLimpio) {
+                cambio = true;
+                return { ...h, autor: nombreLimpio };
+              }
+            }
+            return h;
+          })
+        : data.historial;
+
+      if (cambio) {
+        await updateDoc(doc(db, 'casos', d.id), {
+          ...(constancias !== undefined ? { constancias } : {}),
+          ...(diagnosticos !== undefined ? { diagnosticos } : {}),
+          ...(ordenesServicio !== undefined ? { ordenesServicio } : {}),
+          ...(informesTecnicos !== undefined ? { informesTecnicos } : {}),
+          ...(entrega !== undefined ? { entrega } : {}),
+          ...(responsableApertura !== undefined ? { responsableApertura } : {}),
+          ...(historial !== undefined ? { historial } : {})
+        });
+        docsModificados++;
+      }
+    }
+
+    for (const d of ordenesSnap.docs) {
+      const data = d.data();
+      let cambioOrd = false;
+      const updatesOrd: Record<string, any> = {};
+
+      if (data.diagnostico && coincideConUsuario(data.diagnostico.tecnicoDiagnostico)) {
+        if (data.diagnostico.tecnicoDiagnostico !== nombreLimpio) {
+          updatesOrd['diagnostico.tecnicoDiagnostico'] = nombreLimpio;
+          cambioOrd = true;
+        }
+      }
+      if (data.intervencion && coincideConUsuario(data.intervencion.tecnicoAsignado)) {
+        if (data.intervencion.tecnicoAsignado !== nombreLimpio) {
+          updatesOrd['intervencion.tecnicoAsignado'] = nombreLimpio;
+          cambioOrd = true;
+        }
+      }
+
+      if (cambioOrd) {
+        await updateDoc(doc(db, 'ordenes_servicio', d.id), updatesOrd);
+        docsModificados++;
+      }
+    }
+  } catch (err) {
+    console.warn('Error sincronizando nombre de usuario en expedientes:', err);
+  }
+
+  return docsModificados;
+};
+
 export const actualizarUsuarioSistema = async (
   id: string,
   datos: Partial<Omit<UsuarioSistema, 'id'>>
 ): Promise<void> => {
   try {
     const docRef = doc(db, 'usuarios', id);
+    const snapPrev = await getDoc(docRef);
+    const prevData = snapPrev.exists() ? (snapPrev.data() as UsuarioSistema) : undefined;
+    const nombresPrevios = [prevData?.nombreCompleto, prevData?.correo].filter(Boolean) as string[];
+
     await updateDoc(docRef, datos);
+
+    if (datos.nombreCompleto) {
+      setCachedUsuariosSistema(
+        getCachedUsuariosSistema().map((u) => (u.id === id ? { ...u, ...datos } : u))
+      );
+      await sincronizarNombreUsuarioEnExpedientes(id, datos.nombreCompleto, nombresPrevios);
+    }
   } catch (err) {
     console.error('Error al actualizar usuario:', err);
     throw err;

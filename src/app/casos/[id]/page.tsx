@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { 
-  getCasoByCodigo, 
+import {
+  getCasoByCodigo,
   suscribirCaso,
   registrarNuevaIncidencia,
   registrarAtencionSimple,
+  actualizarConstanciaAtencion,
   registrarDiagnosticoTecnico,
   registrarDecisionPropuestaTecnica,
   guardarIntervencionTecnicaOS,
@@ -17,22 +18,22 @@ import {
   firmarLiquidacionYCerrarCaso
 } from "@/services/casoService"
 import { getRepuestosCatalogo, crearRepuesto } from "@/services/repuestoService"
-import { getUsuariosSistema } from "@/services/usuarioService"
-import { 
-  Caso, 
-  IncidenciaCaso, 
-  DiagnosticoTecnicoCaso, 
-  OrdenServicioTrabajo, 
+import { getUsuariosSistema, resolverNombreTecnico } from "@/services/usuarioService"
+import {
+  Caso,
+  IncidenciaCaso,
+  DiagnosticoTecnicoCaso,
+  OrdenServicioTrabajo,
   InformeTecnicoCaso,
   PruebasQAChecklist,
-  ConstanciaAtencionSimple, 
-  PrioridadIncidencia, 
-  OrigenIncidencia, 
-  TipoOrdenServicio, 
-  RepuestoCatalogo, 
-  RepuestoItem, 
+  ConstanciaAtencionSimple,
+  PrioridadIncidencia,
+  OrigenIncidencia,
+  TipoOrdenServicio,
+  RepuestoCatalogo,
+  RepuestoItem,
   UsuarioSistema,
-  EstadoCaso 
+  EstadoCaso
 } from "@/types"
 import { generarConstanciaAtencionPDF } from "@/lib/pdf/ConstanciaAtencionPDF"
 import { generarInformeTecnicoCasoPDF } from "@/lib/pdf/InformeTecnicoCasoPDF"
@@ -43,28 +44,28 @@ import { UserMenu } from "@/components/auth/UserMenu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog"
-import { 
-  ArrowLeft, 
-  CheckCircle2, 
-  Clock, 
-  FileText, 
-  Laptop, 
-  ShieldCheck, 
-  Wrench, 
-  AlertCircle, 
-  Plus, 
-  Download, 
-  Check, 
-  X, 
-  FolderOpen, 
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Laptop,
+  ShieldCheck,
+  Wrench,
+  AlertCircle,
+  Plus,
+  Download,
+  Check,
+  X,
+  FolderOpen,
   RefreshCw,
   Building2,
   Calendar,
@@ -84,6 +85,7 @@ import {
   GitBranch
 } from "lucide-react"
 import { toast } from "sonner"
+import { referenciaServicioCaso } from "@/lib/pdf/pdfTheme"
 import { format } from "date-fns"
 import { useAuth } from "@/context/AuthContext"
 
@@ -121,6 +123,9 @@ export default function ExpedienteCasoPage() {
   const [nuevaIncEsGarantia, setNuevaIncEsGarantia] = useState(false)
 
   // Formulario: Atención Simple (Constancia)
+  const [constanciaEditandoId, setConstanciaEditandoId] = useState<string | null>(null)
+  const [constanciaFechaIngreso, setConstanciaFechaIngreso] = useState(() => format(new Date(), "yyyy-MM-dd"))
+  const [constanciaFechaSalida, setConstanciaFechaSalida] = useState(() => format(new Date(), "yyyy-MM-dd"))
   const [constanciaTicketItop, setConstanciaTicketItop] = useState("")
   const [constanciaFallaReal, setConstanciaFallaReal] = useState("")
   const [constanciaActividades, setConstanciaActividades] = useState("Limpieza interna, remoción de polvo, optimización y pruebas de operatividad.")
@@ -157,7 +162,7 @@ export default function ExpedienteCasoPage() {
   const repuestosFiltrados = useMemo(() => {
     const q = busquedaRepuesto.trim().toLowerCase()
     if (!q) return repuestosCatalogo.slice(0, 6)
-    return repuestosCatalogo.filter(r => 
+    return repuestosCatalogo.filter(r =>
       r.id.toLowerCase().includes(q) ||
       (r.descripcion && r.descripcion.toLowerCase().includes(q)) ||
       (r.modeloCompatible && r.modeloCompatible.toLowerCase().includes(q)) ||
@@ -366,6 +371,69 @@ export default function ExpedienteCasoPage() {
     }
   }
 
+  const normalizarFechaParaInputDate = (val?: string | null): string => {
+    if (!val) return format(new Date(), "yyyy-MM-dd")
+    const s = String(val).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    const mSlash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (mSlash) return `${mSlash[3]}-${mSlash[2].padStart(2, "0")}-${mSlash[1].padStart(2, "0")}`
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10)
+    try {
+      const d = new Date(s)
+      if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd")
+    } catch { }
+    return format(new Date(), "yyyy-MM-dd")
+  }
+
+  const formatearFechaVisualConstancia = (val?: string | null, fallbackIso?: string | null): string => {
+    const raw = (val || fallbackIso || "").trim()
+    if (!raw) return format(new Date(), "dd/MM/yyyy")
+    const mYmd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (mYmd) return `${mYmd[3]}/${mYmd[2]}/${mYmd[1]}`
+    const mSlash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (mSlash) return `${mSlash[1].padStart(2, "0")}/${mSlash[2].padStart(2, "0")}/${mSlash[3]}`
+    try {
+      return format(new Date(raw), "dd/MM/yyyy")
+    } catch {
+      return raw
+    }
+  }
+
+  const abrirModalNuevaConstancia = () => {
+    const incRef = caso?.incidencias?.[caso.incidencias.length - 1] || caso?.incidencias?.[0]
+    const fechaBase = normalizarFechaParaInputDate(incRef?.fecha || caso?.fechaApertura)
+    setConstanciaEditandoId(null)
+    setConstanciaFechaIngreso(fechaBase)
+    setConstanciaFechaSalida(fechaBase)
+    setConstanciaTicketItop("")
+    setConstanciaFallaReal("")
+    setConstanciaActividades("Limpieza interna, remoción de polvo, optimización y pruebas de operatividad.")
+    setConstanciaResultado("Equipo operativo a plena satisfacción.")
+    setConstanciaObservaciones("Ninguna")
+    setConstanciaTecnico(resolverNombreTecnico(operadorNombre, usuarios))
+    setModalAtencionSimpleOpen(true)
+  }
+
+  const abrirModalEditarConstancia = (cst: ConstanciaAtencionSimple) => {
+    const incRef =
+      (cst.incidenciaId ? caso?.incidencias?.find((i) => i.id === cst.incidenciaId) : undefined) ||
+      caso?.incidencias?.[0]
+    setConstanciaEditandoId(cst.id || cst.codigoConstancia)
+    setConstanciaFechaIngreso(
+      normalizarFechaParaInputDate(cst.fechaIngreso || incRef?.fecha || caso?.fechaApertura || cst.fecha)
+    )
+    setConstanciaFechaSalida(
+      normalizarFechaParaInputDate(cst.fechaSalida || cst.fecha || incRef?.fecha)
+    )
+    setConstanciaTicketItop(cst.ticketItop || "")
+    setConstanciaFallaReal(cst.fallaReal || "")
+    setConstanciaActividades(cst.actividadesRealizadas || "")
+    setConstanciaResultado(cst.resultado || "")
+    setConstanciaObservaciones(cst.observaciones || "Ninguna")
+    setConstanciaTecnico(resolverNombreTecnico(cst.tecnicoResponsable, usuarios, cst.tecnicoId) || operadorNombre)
+    setModalAtencionSimpleOpen(true)
+  }
+
   const handleGuardarAtencionSimple = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!constanciaActividades.trim() || !constanciaResultado.trim()) {
@@ -376,7 +444,37 @@ export default function ExpedienteCasoPage() {
       toast.error("Por favor ingrese el número o código de Ticket de iTop asistido.")
       return
     }
+    if (!constanciaFechaIngreso || !constanciaFechaSalida) {
+      toast.error("Por favor ingrese la fecha de ingreso y de salida del servicio.")
+      return
+    }
     try {
+      const tecElegido = resolverNombreTecnico(constanciaTecnico || operadorNombre, usuarios)
+      const usuarioMatch = usuarios.find(
+        (u) => u.nombreCompleto.trim().toLowerCase() === tecElegido.trim().toLowerCase()
+      )
+
+      if (constanciaEditandoId) {
+        const actualizada = await actualizarConstanciaAtencion(codigo, constanciaEditandoId, {
+          fechaIngreso: constanciaFechaIngreso,
+          horaIngreso: "",
+          fechaSalida: constanciaFechaSalida,
+          horaSalida: "",
+          ticketItop: constanciaTicketItop.trim().toUpperCase(),
+          fallaReal: constanciaFallaReal.trim() || undefined,
+          actividadesRealizadas: constanciaActividades.trim(),
+          resultado: constanciaResultado.trim(),
+          observaciones: constanciaObservaciones.trim() || "Ninguna",
+          tecnicoResponsable: tecElegido,
+          tecnicoId: usuarioMatch?.id
+        })
+        toast.success(`Constancia ${actualizada.codigoConstancia} actualizada con éxito.`)
+        setModalAtencionSimpleOpen(false)
+        setConstanciaEditandoId(null)
+        if (caso) generarConstanciaAtencionPDF(caso, actualizada)
+        return
+      }
+
       const incActual = caso?.incidencias?.[caso.incidencias.length - 1] || caso?.incidencias?.[0]
       const motivoDesdeIngreso = incActual?.descripcion || "Soporte menor / mantenimiento preventivo"
       const res = await registrarAtencionSimple(codigo, {
@@ -387,7 +485,12 @@ export default function ExpedienteCasoPage() {
         resultado: constanciaResultado.trim(),
         ticketItop: constanciaTicketItop.trim().toUpperCase(),
         observaciones: constanciaObservaciones.trim() || "Ninguna",
-        tecnicoResponsable: constanciaTecnico || operadorNombre
+        tecnicoResponsable: tecElegido,
+        tecnicoId: usuarioMatch?.id,
+        fechaIngreso: constanciaFechaIngreso,
+        horaIngreso: "",
+        fechaSalida: constanciaFechaSalida,
+        horaSalida: ""
       })
       toast.success(`Constancia ${res.codigoConstancia} generada con éxito.`)
       setModalAtencionSimpleOpen(false)
@@ -453,7 +556,7 @@ export default function ExpedienteCasoPage() {
 
     const existenteIndex = dtRepuestosSeleccionados.findIndex(r => r.partNumber === item.id)
     if (existenteIndex >= 0) {
-      setDtRepuestosSeleccionados(prev => prev.map((r, i) => 
+      setDtRepuestosSeleccionados(prev => prev.map((r, i) =>
         i === existenteIndex ? { ...r, cantidad: r.cantidad + Math.max(1, repuestoCantidad) } : r
       ))
       toast.success(`Se sumaron ${repuestoCantidad} und a [${item.id}].`)
@@ -508,7 +611,7 @@ export default function ExpedienteCasoPage() {
       const cant = Math.max(1, nuevoRepuestoCantidad)
       const existenteIndex = dtRepuestosSeleccionados.findIndex(r => r.partNumber === pn)
       if (existenteIndex >= 0) {
-        setDtRepuestosSeleccionados(prev => prev.map((r, i) => 
+        setDtRepuestosSeleccionados(prev => prev.map((r, i) =>
           i === existenteIndex ? { ...r, cantidad: r.cantidad + cant } : r
         ))
       } else {
@@ -790,8 +893,8 @@ export default function ExpedienteCasoPage() {
       }
 
       toast.success(
-        entregaAplicaGarantia 
-          ? "Equipo entregado y garantía técnica activada con éxito." 
+        entregaAplicaGarantia
+          ? "Equipo entregado y garantía técnica activada con éxito."
           : "Equipo entregado a satisfacción del cliente."
       )
       setModalEntregaOpen(false)
@@ -851,8 +954,8 @@ export default function ExpedienteCasoPage() {
     || (incidencias.length <= 1 ? caso.constancias?.[caso.constancias.length - 1] : undefined)
 
   // OS asociada a la incidencia o DT activo:
-  const osActual = caso.ordenesServicio?.find(os => 
-    (dtActual && (os.diagnosticoId === dtActual.id || os.diagnosticoId === dtActual.codigoDT)) || 
+  const osActual = caso.ordenesServicio?.find(os =>
+    (dtActual && (os.diagnosticoId === dtActual.id || os.diagnosticoId === dtActual.codigoDT)) ||
     (ultimaInc && os.incidenciaId === ultimaInc.id)
   ) || (incidencias.length <= 1 ? caso.ordenesServicio?.[caso.ordenesServicio.length - 1] : undefined)
 
@@ -863,11 +966,11 @@ export default function ExpedienteCasoPage() {
   const informeActual: InformeTecnicoCaso | undefined =
     (osActual
       ? caso.informesTecnicos?.find(
-          (it) =>
-            (osActual.informeTecnicoId && it.codigoInforme === osActual.informeTecnicoId) ||
-            it.ordenServicioId === osActual.codigoOS ||
-            it.ordenServicioId === osActual.id
-        )
+        (it) =>
+          (osActual.informeTecnicoId && it.codigoInforme === osActual.informeTecnicoId) ||
+          it.ordenServicioId === osActual.codigoOS ||
+          it.ordenServicioId === osActual.id
+      )
       : undefined) ||
     (incidencias.length <= 1 ? caso.informesTecnicos?.[caso.informesTecnicos.length - 1] : undefined)
   const ultimoInforme = informeActual || caso.informesTecnicos?.[caso.informesTecnicos.length - 1]
@@ -886,85 +989,85 @@ export default function ExpedienteCasoPage() {
   const esRutaSimple = !requiereAnalisisTecnico
 
   const etapas = [
-    { 
+    {
       id: "etapa1" as const,
-      num: 1, 
-      label: "Ingreso / Incidencia", 
+      num: 1,
+      label: "Ingreso / Incidencia",
       sub: ultimaInc ? (ultimaInc.codigoINC || "Recepción") : (caso.origen === "ALQUILER" ? "Alquiler Corp." : "Recepción"),
       badge: "Listo",
       badgeColor: "bg-emerald-100 text-emerald-800",
-      activo: false, 
-      completo: true 
+      activo: false,
+      completo: true
     },
-    { 
+    {
       id: "etapa2" as const,
-      num: 2, 
-      label: esRutaSimple ? "2.A Atención Simple" : "2.B Diagnóstico", 
-      sub: esRutaSimple 
+      num: 2,
+      label: esRutaSimple ? "2.A Atención Simple" : "2.B Diagnóstico",
+      sub: esRutaSimple
         ? (tieneConstanciaActual ? `Constancia ${constanciaActual?.codigoConstancia}` : 'Requiere Constancia')
         : (dtActual ? `${dtActual.codigoDT} · ${dtActual.estado === 'APROBADO' ? 'Aprobado' : dtActual.estado === 'RECHAZADO' ? 'Rechazado' : 'Por Autorizar'}` : 'Pendiente DT'),
-      badge: esRutaSimple 
+      badge: esRutaSimple
         ? (tieneConstanciaActual ? 'Listo' : 'En Curso')
         : (dtActual ? (dtActual.estado === 'APROBADO' ? 'Aprobado' : dtActual.estado === 'RECHAZADO' ? 'Rechazado' : 'Por Autorizar') : 'Pendiente'),
-      badgeColor: esRutaSimple 
+      badgeColor: esRutaSimple
         ? (tieneConstanciaActual ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800")
         : (dtActual?.estado === 'APROBADO' ? "bg-emerald-100 text-emerald-800" : dtActual?.estado === 'RECHAZADO' ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"),
-      activo: esRutaSimple 
-        ? !tieneConstanciaActual 
+      activo: esRutaSimple
+        ? !tieneConstanciaActual
         : ['ABIERTO', 'EN_DIAGNOSTICO', 'PENDIENTE_DE_APROBACION', 'DIAGNOSTICADO'].includes(estadoNorm),
-      completo: esRutaSimple 
-        ? tieneConstanciaActual 
+      completo: esRutaSimple
+        ? tieneConstanciaActual
         : (['APROBADO_PARA_REPARACION', 'EN_REPARACION', 'EN_PRUEBAS', 'REPARADO', 'ENTREGADO', 'EN_GARANTIA', 'CERRADO', 'CERRADO_SIN_REPARACION'].includes(estadoNorm) || Boolean(dtActual?.estado === 'APROBADO'))
     },
-    { 
+    {
       id: "etapa3" as const,
-      num: 3, 
-      label: esRutaSimple ? "3. Taller (Omitido)" : "3. Intervención & QA", 
-      sub: esRutaSimple 
-        ? 'No aplica a 2.A' 
-        : (osActual 
-            ? (osActual.estado === 'FINALIZADA' 
-                ? (osActual.pruebasQA?.resultadoOperatividad === 'INOPERATIVO' ? `${osActual.codigoOS} · Inoperativo` : `${osActual.codigoOS} · Reparado / Listo`) 
-                : osActual.estado === 'EN_PRUEBAS'
-                  ? `${osActual.codigoOS} · En Pruebas QA`
-                  : (osActual.pruebasQA?.resultadoOperatividad === 'OBSERVADO' ? `${osActual.codigoOS} · Observado` : `${osActual.codigoOS} · Actividades y Horas`)) 
-            : (dtActual?.estado === 'APROBADO' ? 'Paso 1: Actividades' : 'Bloqueado')),
-      badge: esRutaSimple 
-        ? 'No Aplica' 
-        : (osActual 
-            ? (osActual.estado === 'FINALIZADA' 
-                ? (osActual.pruebasQA?.resultadoOperatividad === 'INOPERATIVO' ? 'Inoperativo' : 'Reparado') 
-                : osActual.estado === 'EN_PRUEBAS'
-                  ? 'Paso 2: QA'
-                  : 'Paso 1: Taller') 
-            : (dtActual?.estado === 'APROBADO' ? 'Por Iniciar' : 'Bloqueado')),
-      badgeColor: esRutaSimple 
-        ? "bg-slate-100 text-slate-500" 
+      num: 3,
+      label: esRutaSimple ? "3. Taller (Omitido)" : "3. Intervención & QA",
+      sub: esRutaSimple
+        ? 'No aplica a 2.A'
+        : (osActual
+          ? (osActual.estado === 'FINALIZADA'
+            ? (osActual.pruebasQA?.resultadoOperatividad === 'INOPERATIVO' ? `${osActual.codigoOS} · Inoperativo` : `${osActual.codigoOS} · Reparado / Listo`)
+            : osActual.estado === 'EN_PRUEBAS'
+              ? `${osActual.codigoOS} · En Pruebas QA`
+              : (osActual.pruebasQA?.resultadoOperatividad === 'OBSERVADO' ? `${osActual.codigoOS} · Observado` : `${osActual.codigoOS} · Actividades y Horas`))
+          : (dtActual?.estado === 'APROBADO' ? 'Paso 1: Actividades' : 'Bloqueado')),
+      badge: esRutaSimple
+        ? 'No Aplica'
+        : (osActual
+          ? (osActual.estado === 'FINALIZADA'
+            ? (osActual.pruebasQA?.resultadoOperatividad === 'INOPERATIVO' ? 'Inoperativo' : 'Reparado')
+            : osActual.estado === 'EN_PRUEBAS'
+              ? 'Paso 2: QA'
+              : 'Paso 1: Taller')
+          : (dtActual?.estado === 'APROBADO' ? 'Por Iniciar' : 'Bloqueado')),
+      badgeColor: esRutaSimple
+        ? "bg-slate-100 text-slate-500"
         : (osActual?.estado === 'FINALIZADA' ? "bg-emerald-100 text-emerald-800" : osActual ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-500"),
       activo: !esRutaSimple && ['APROBADO_PARA_REPARACION', 'EN_REPARACION', 'EN_PRUEBAS', 'OBSERVADO'].includes(estadoNorm),
       completo: esRutaSimple ? tieneConstanciaActual : ['REPARADO', 'INOPERATIVO', 'ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)
     },
-    { 
+    {
       id: "etapa4" as const,
-      num: 4, 
-      label: "4. Entrega y Cierre", 
-      sub: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm) 
-        ? 'Finalizado' 
+      num: 4,
+      label: "4. Entrega y Cierre",
+      sub: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)
+        ? 'Finalizado'
         : (estadoNorm === 'INOPERATIVO'
           ? 'Baja / Devolución'
           : (estadoNorm === 'REPARADO' || (tieneConstanciaActual && !['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)))
-            ? 'Listo para Entrega' 
+            ? 'Listo para Entrega'
             : (esRutaSimple ? 'Esperando Constancia' : 'Bloqueado')),
-      badge: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm) 
-        ? 'Emitido' 
-        : (estadoNorm === 'REPARADO' || (tieneConstanciaActual && !['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm))) 
-        ? 'Listo' 
-        : 'Bloqueado',
-      badgeColor: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm) 
-        ? "bg-emerald-100 text-emerald-800" 
-        : (estadoNorm === 'REPARADO' || tieneConstanciaActual) 
-        ? "bg-emerald-100 text-emerald-800" 
-        : "bg-slate-100 text-slate-500",
+      badge: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)
+        ? 'Emitido'
+        : (estadoNorm === 'REPARADO' || (tieneConstanciaActual && !['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)))
+          ? 'Listo'
+          : 'Bloqueado',
+      badgeColor: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)
+        ? "bg-emerald-100 text-emerald-800"
+        : (estadoNorm === 'REPARADO' || tieneConstanciaActual)
+          ? "bg-emerald-100 text-emerald-800"
+          : "bg-slate-100 text-slate-500",
       activo: ['REPARADO', 'INOPERATIVO'].includes(estadoNorm) || (tieneConstanciaActual && !['ENTREGADO', 'EN_GARANTIA', 'CERRADO'].includes(estadoNorm)),
       completo: ['ENTREGADO', 'EN_GARANTIA', 'CERRADO', 'CERRADO_SIN_REPARACION'].includes(estadoNorm)
     },
@@ -980,17 +1083,29 @@ export default function ExpedienteCasoPage() {
     }
   ]
 
+  // Atención Simple: flujo corto de 3 pasos (Ingreso → Atención y Constancia → Entrega).
+  // Se oculta la Etapa 3 (Taller/QA) porque no aplica y solo distrae al técnico.
+  const etapasVisibles = esRutaSimple
+    ? etapas
+        .filter((e) => e.id !== "etapa3")
+        .map((e) => {
+          if (e.id === "etapa2") return { ...e, label: "Atención y Constancia" }
+          if (e.id === "etapa4") return { ...e, num: 3, label: "Entrega y Cierre" }
+          return e
+        })
+    : etapas
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
-      
+
       {/* Top Bar Superior Organizado y Sin Acumulación */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-16 py-2.5 flex items-center justify-between gap-3">
-          
+
           {/* Zona Izquierda: Navegación + Identidad del Expediente */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <button 
-              onClick={() => router.push('/casos')} 
+            <button
+              onClick={() => router.push('/casos')}
               className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70 shrink-0"
               title="Volver a lista de Casos"
             >
@@ -1107,32 +1222,30 @@ export default function ExpedienteCasoPage() {
 
         {/* Stepper Maestro Interactivo Unificado (Navegación de 5 Etapas) */}
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {etapas.map((etapa) => {
+          <div className={`grid grid-cols-2 md:grid-cols-3 ${esRutaSimple ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-2.5`}>
+            {etapasVisibles.map((etapa) => {
               const isSelected = activeTab === etapa.id
               return (
                 <button
                   key={etapa.id}
                   type="button"
                   onClick={() => setActiveTab(etapa.id)}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 w-full cursor-pointer relative overflow-hidden ${
-                    isSelected 
-                      ? 'border-[#2369A1] ring-2 ring-[#2369A1]/20 bg-blue-50/50 shadow-xs' 
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 w-full cursor-pointer relative overflow-hidden ${isSelected
+                      ? 'border-[#2369A1] ring-2 ring-[#2369A1]/20 bg-blue-50/50 shadow-xs'
                       : 'hover:border-slate-300 hover:bg-slate-50/60 bg-white border-slate-200'
-                  }`}
+                    }`}
                 >
                   {isSelected && (
                     <div className="absolute top-0 left-0 right-0 h-1 bg-[#2369A1]" />
                   )}
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
-                    etapa.completo 
-                      ? 'bg-emerald-600 text-white' 
-                      : etapa.activo 
-                      ? 'bg-[#2369A1] text-white shadow-xs' 
-                      : etapa.id === 'historial'
-                      ? (isSelected ? 'bg-[#2369A1] text-white' : 'bg-slate-100 text-slate-600 border border-slate-200')
-                      : 'bg-slate-100 text-slate-500'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${etapa.completo
+                      ? 'bg-emerald-600 text-white'
+                      : etapa.activo
+                        ? 'bg-[#2369A1] text-white shadow-xs'
+                        : etapa.id === 'historial'
+                          ? (isSelected ? 'bg-[#2369A1] text-white' : 'bg-slate-100 text-slate-600 border border-slate-200')
+                          : 'bg-slate-100 text-slate-500'
+                    }`}>
                     {etapa.completo ? (
                       <CheckCircle2 className="w-4 h-4" />
                     ) : etapa.id === 'historial' ? (
@@ -1147,13 +1260,12 @@ export default function ExpedienteCasoPage() {
                         {etapa.id === 'historial' ? 'Auditoría' : `Etapa ${etapa.num}`}
                       </span>
                       {etapa.badge && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                          etapa.activo 
-                            ? 'text-blue-700 bg-blue-100 animate-pulse' 
-                            : etapa.completo 
-                            ? 'text-emerald-700 bg-emerald-100' 
-                            : 'text-slate-600 bg-slate-100'
-                        }`}>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${etapa.activo
+                            ? 'text-blue-700 bg-blue-100 animate-pulse'
+                            : etapa.completo
+                              ? 'text-emerald-700 bg-emerald-100'
+                              : 'text-slate-600 bg-slate-100'
+                          }`}>
                           {etapa.badge}
                         </span>
                       )}
@@ -1203,11 +1315,10 @@ export default function ExpedienteCasoPage() {
                   <Laptop className="w-4 h-4 text-[#2369A1]" />
                   Activo en Expediente
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  caso.origen === "ALQUILER" ? "bg-purple-50 text-purple-700 border-purple-200" :
-                  caso.origen === "RECLAMO_GARANTIA" ? "bg-amber-50 text-amber-800 border-amber-300" :
-                  "bg-blue-50 text-[#2369A1] border-blue-200"
-                }`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${caso.origen === "ALQUILER" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                    caso.origen === "RECLAMO_GARANTIA" ? "bg-amber-50 text-amber-800 border-amber-300" :
+                      "bg-blue-50 text-[#2369A1] border-blue-200"
+                  }`}>
                   {caso.origen}
                 </span>
               </div>
@@ -1220,10 +1331,11 @@ export default function ExpedienteCasoPage() {
                     {caso.equipo.numeroSerie}
                   </span>
                 </p>
-                {caso.contratoAlquiler && (
+                {(caso.contratoAlquiler || caso.ordenServicioCliente) && (
                   <div className="pt-1">
                     <span className="text-[11px] font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2 py-1 rounded block">
-                      Contrato Alquiler: <strong>{caso.contratoAlquiler}</strong>
+                      Servicio contratado: <strong>{referenciaServicioCaso(caso)}</strong>
+                      {caso.servicioId && <span className="ml-1 font-mono text-[10px] text-purple-500">({caso.servicioId})</span>}
                     </span>
                   </div>
                 )}
@@ -1251,9 +1363,8 @@ export default function ExpedienteCasoPage() {
                 {esRutaSimple ? (
                   <div className="flex items-center justify-between py-1">
                     <span className="text-slate-500">2.A Constancia Atención:</span>
-                    <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${
-                      constanciaActual ? "text-teal-800 bg-teal-50 border border-teal-200" : "text-slate-400"
-                    }`}>
+                    <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${constanciaActual ? "text-teal-800 bg-teal-50 border border-teal-200" : "text-slate-400"
+                      }`}>
                       {constanciaActual?.codigoConstancia || "Pendiente"}
                     </span>
                   </div>
@@ -1261,25 +1372,22 @@ export default function ExpedienteCasoPage() {
                   <>
                     <div className="flex items-center justify-between py-1 border-b border-slate-50">
                       <span className="text-slate-500">2.B Diagnóstico Técnico:</span>
-                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${
-                        dtActual ? "text-amber-800 bg-amber-50 border border-amber-200" : "text-slate-400"
-                      }`}>
+                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${dtActual ? "text-amber-800 bg-amber-50 border border-amber-200" : "text-slate-400"
+                        }`}>
                         {dtActual?.codigoDT || "Pendiente"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-1 border-b border-slate-50">
                       <span className="text-slate-500">3. Orden de Servicio:</span>
-                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${
-                        osActual ? "text-violet-800 bg-violet-50 border border-violet-200" : "text-slate-400"
-                      }`}>
+                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${osActual ? "text-violet-800 bg-violet-50 border border-violet-200" : "text-slate-400"
+                        }`}>
                         {osActual?.codigoOS || "Pendiente"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-1">
                       <span className="text-slate-500">4. Informe Técnico:</span>
-                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${
-                        informeActual ? "text-emerald-800 bg-emerald-50 border border-emerald-200" : "text-slate-400"
-                      }`}>
+                      <span className={`font-mono font-semibold px-1.5 py-0.5 rounded ${informeActual ? "text-emerald-800 bg-emerald-50 border border-emerald-200" : "text-slate-400"
+                        }`}>
                         {informeActual?.codigoInforme || (osActual?.estado === "FINALIZADA" ? "Al descargar" : "Pendiente QA")}
                       </span>
                     </div>
@@ -1356,11 +1464,10 @@ export default function ExpedienteCasoPage() {
                         <span className="font-mono text-xs font-bold text-[#2369A1] bg-white px-2 py-0.5 rounded border border-blue-200">
                           {ultimaInc?.codigoINC || "INC-001"}
                         </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                          ultimaInc?.prioridad === "CRITICA" ? "bg-rose-50 text-rose-700 border-rose-300 font-bold" :
-                          ultimaInc?.prioridad === "ALTA" ? "bg-amber-50 text-amber-700 border-amber-300" :
-                          "bg-slate-100 text-slate-700 border-slate-200"
-                        }`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ultimaInc?.prioridad === "CRITICA" ? "bg-rose-50 text-rose-700 border-rose-300 font-bold" :
+                            ultimaInc?.prioridad === "ALTA" ? "bg-amber-50 text-amber-700 border-amber-300" :
+                              "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}>
                           Prioridad {ultimaInc?.prioridad || "MEDIA"}
                         </span>
                         {incidencias.length > 1 && (
@@ -1435,12 +1542,12 @@ export default function ExpedienteCasoPage() {
                   )}
 
                   <div className="pt-3 flex justify-end">
-                    <Button 
+                    <Button
                       size="sm"
                       onClick={() => setActiveTab("etapa2")}
                       className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs"
                     >
-                      Continuar a Etapa 2: Diagnóstico →
+                      {esRutaSimple ? "Continuar: Atención y Constancia →" : "Continuar a Etapa 2: Diagnóstico →"}
                     </Button>
                   </div>
                 </div>
@@ -1453,49 +1560,59 @@ export default function ExpedienteCasoPage() {
             {activeTab === "etapa2" && esRutaSimple ? (
               /* VISTA EXCLUSIVA RUTA 2.A: ATENCIÓN SIMPLE */
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-3 flex-wrap">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-900">Etapa 2.A: Atención Simple</h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                        Soporte Menor
-                      </span>
-                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">Atención y Constancia</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Soporte técnico rápido (limpieza, lubricación, configuración, reinicio o sustitución rápida). Sin diagnóstico formal ni repuestos de laboratorio.
+                      Soporte rápido sin taller. Registra lo realizado y descarga la constancia para la firma del cliente.
                     </p>
                   </div>
-                  {!tieneConstanciaActual && (
-                    <Button
-                      size="sm"
-                      onClick={() => setModalAtencionSimpleOpen(true)}
-                      className="bg-teal-700 hover:bg-teal-800 text-white text-xs h-8 gap-1.5 font-semibold shadow-xs"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Registrar Atención Simple
-                    </Button>
-                  )}
                 </div>
+
+                {/* Guía didáctica de 3 pasos */}
+                {(() => {
+                  const entregado = ["ENTREGADO", "EN_GARANTIA", "CERRADO"].includes(estadoNorm)
+                  const actual = !tieneConstanciaActual ? 1 : entregado ? 4 : 2
+                  const pasos = ["Registrar atención", "Descargar y firmar constancia", "Entregar equipo"]
+                  return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {pasos.map((txt, i) => {
+                        const n = i + 1
+                        const hecho = n < actual
+                        const enCurso = n === actual
+                        return (
+                          <div key={txt} className="flex items-center gap-2">
+                            <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                              hecho ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : enCurso ? "bg-[#2369A1] text-white border-[#2369A1]"
+                                  : "bg-white text-slate-400 border-slate-200"}`}>
+                              <span className="font-mono">{hecho ? "✓" : n}</span>
+                              {txt}
+                            </div>
+                            {n < pasos.length && <span className="text-slate-300">›</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
                 {/* Si no hay constancia emitida aún */}
                 {!tieneConstanciaActual && (
-                  <div className="py-10 text-center space-y-3 bg-teal-50/40 border border-dashed border-teal-300 rounded-xl">
-                    <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 mx-auto">
-                      <Clock className="w-5 h-5" />
-                    </div>
+                  <div className="py-8 text-center space-y-3 bg-slate-50/60 border border-dashed border-slate-300 rounded-xl">
                     <div>
-                      <p className="text-xs font-bold text-teal-950">Atención Simple en Espera de Registro</p>
-                      <p className="text-xs text-teal-700 max-w-md mx-auto mt-0.5">
-                        Este caso no requiere análisis técnico ni descarte formal de laboratorio. Registre las actividades menores de soporte para emitir la Constancia de Atención.
+                      <p className="text-xs font-bold text-slate-800">Paso 1: registra la atención</p>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto mt-0.5">
+                        Indica qué se hizo y el resultado. Las horas de ingreso y salida se escriben a mano en la constancia impresa.
                       </p>
                     </div>
                     <Button
                       size="sm"
-                      onClick={() => setModalAtencionSimpleOpen(true)}
-                      className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold shadow-xs"
+                      onClick={abrirModalNuevaConstancia}
+                      className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold shadow-xs"
                     >
                       <FileText className="w-3.5 h-3.5 mr-1.5" />
-                      Registrar Atención Simple y Emitir Constancia
+                      Registrar atención y generar constancia
                     </Button>
                   </div>
                 )}
@@ -1504,8 +1621,8 @@ export default function ExpedienteCasoPage() {
                 {ultimaConstancia && (
                   <div className="space-y-4">
                     <div className="border border-teal-200 rounded-xl p-4 bg-teal-50/30 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                             {ultimaConstancia.codigoConstancia}
                           </span>
@@ -1516,18 +1633,59 @@ export default function ExpedienteCasoPage() {
                             EMITIDA
                           </span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => generarConstanciaAtencionPDF(caso, ultimaConstancia)}
-                          className="text-xs h-7.5 border-teal-300 text-teal-900 gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5 text-teal-700" />
-                          Constancia de Atención (PDF)
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => abrirModalEditarConstancia(ultimaConstancia)}
+                            className="text-xs h-7.5 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 gap-1.5"
+                          >
+                            <PenTool className="w-3.5 h-3.5 text-teal-700" />
+                            Editar Constancia
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generarConstanciaAtencionPDF(caso, ultimaConstancia)}
+                            className="text-xs h-7.5 border-teal-300 bg-white hover:bg-teal-50 text-teal-900 gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5 text-teal-700" />
+                            Constancia de Atención (PDF)
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="text-xs bg-white p-3.5 rounded-lg border border-teal-100 space-y-2">
+                      <div className="text-xs bg-white p-3.5 rounded-lg border border-teal-100 space-y-2.5">
+                        {/* Bloque de Fechas y Horas de Ingreso y Salida */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-2 border-b border-teal-50 bg-slate-50/80 p-2 rounded-md">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Fecha de Ingreso</span>
+                            <span className="font-mono font-semibold text-slate-800">
+                              {formatearFechaVisualConstancia(ultimaConstancia.fechaIngreso, ultimaInc?.fecha || caso.fechaApertura)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Hora de Ingreso</span>
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+                              <span className="inline-block w-12 h-4 bg-white border border-slate-400 rounded-[2px] shadow-2xs" title="Cuadrito vacío en PDF para anotar manualmente al firmar" />
+                              <span className="text-[10px] text-slate-500">Manual al firmar</span>
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Fecha Salida</span>
+                            <span className="font-mono font-semibold text-slate-800">
+                              {formatearFechaVisualConstancia(ultimaConstancia.fechaSalida, ultimaConstancia.fecha)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Hora de Salida</span>
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+                              <span className="inline-block w-12 h-4 bg-white border border-slate-400 rounded-[2px] shadow-2xs" title="Cuadrito vacío en PDF para anotar manualmente al firmar" />
+                              <span className="text-[10px] text-slate-500">Manual al firmar</span>
+                            </span>
+                          </div>
+                        </div>
+
                         <div className="flex items-center justify-between pb-1.5 border-b border-teal-50">
                           <span className="font-bold text-slate-700">Falla / Motivo (Ingreso):</span>
                           <span className="text-slate-600 font-medium">{ultimaConstancia.motivoSoporte}</span>
@@ -1550,9 +1708,13 @@ export default function ExpedienteCasoPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Técnico: <strong>{ultimaConstancia.tecnicoResponsable}</strong></span>
-                        <span>Fecha: {format(new Date(ultimaConstancia.fecha), "dd/MM/yyyy HH:mm")}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>
+                          Técnico: <strong>{resolverNombreTecnico(ultimaConstancia.tecnicoResponsable, usuarios, ultimaConstancia.tecnicoId)}</strong>
+                        </span>
+                        <span>
+                          Ingreso: {formatearFechaVisualConstancia(ultimaConstancia.fechaIngreso, ultimaInc?.fecha)} · Salida: {formatearFechaVisualConstancia(ultimaConstancia.fechaSalida, ultimaConstancia.fecha)} · Horas en blanco para firma
+                        </span>
                       </div>
                     </div>
 
@@ -1564,20 +1726,34 @@ export default function ExpedienteCasoPage() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-emerald-950 block">
-                            Atención Simple Concluida Conforme
+                            Paso 2 y 3: imprime la constancia, hazla firmar y entrega el equipo
                           </span>
                           <span className="text-[11px] text-emerald-800">
-                            La Etapa 3 (Taller) se omite. El caso pasa directamente a la Entrega, Garantía y Cierre.
+                            Cuando el cliente firme, registra la entrega para cerrar el caso.
                           </span>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => setActiveTab("etapa4")}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0 gap-1.5 shadow-xs"
-                      >
-                        Pasar a 4. Entrega, Garantía y Cierre →
-                      </Button>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => generarConstanciaAtencionPDF(caso, ultimaConstancia)}
+                          className="border-emerald-300 bg-white text-emerald-800 text-xs font-semibold gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Descargar constancia
+                        </Button>
+                        {!["ENTREGADO", "EN_GARANTIA", "CERRADO"].includes(estadoNorm) && (
+                          <Button
+                            size="sm"
+                            onClick={() => setModalEntregaOpen(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold gap-1.5 shadow-xs"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Registrar entrega de equipo
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1643,13 +1819,12 @@ export default function ExpedienteCasoPage() {
                           <span className="text-xs font-semibold text-slate-800">
                             Falla: <strong>{dtActual.tipoFalla}</strong>
                           </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            dtActual.estado === "APROBADO" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                            dtActual.estado === "RECHAZADO" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                            "bg-amber-50 text-amber-800 border-amber-200 animate-pulse"
-                          }`}>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${dtActual.estado === "APROBADO" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              dtActual.estado === "RECHAZADO" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                "bg-amber-50 text-amber-800 border-amber-200 animate-pulse"
+                            }`}>
                             {dtActual.estado === "APROBADO" ? "APROBADO POR CLIENTE" :
-                             dtActual.estado === "RECHAZADO" ? "RECHAZADO" : "PENDIENTE DE DECISIÓN"}
+                              dtActual.estado === "RECHAZADO" ? "RECHAZADO" : "PENDIENTE DE DECISIÓN"}
                           </span>
                         </div>
 
@@ -1795,11 +1970,10 @@ export default function ExpedienteCasoPage() {
                       {[...caso.diagnosticos].reverse().map((dt) => {
                         const esElActivo = dt.id === dtActual?.id
                         return (
-                          <div 
-                            key={dt.id} 
-                            className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                              esElActivo ? "bg-blue-50/40 border-blue-200" : "bg-slate-50 border-slate-200"
-                            }`}
+                          <div
+                            key={dt.id}
+                            className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${esElActivo ? "bg-blue-50/40 border-blue-200" : "bg-slate-50 border-slate-200"
+                              }`}
                           >
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1810,11 +1984,10 @@ export default function ExpedienteCasoPage() {
                                   </span>
                                 )}
                                 <span className="text-slate-500">• {dt.tipoFalla}</span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  dt.estado === 'APROBADO' ? 'bg-emerald-100 text-emerald-800' :
-                                  dt.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-800' :
-                                  'bg-amber-100 text-amber-800'
-                                }`}>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${dt.estado === 'APROBADO' ? 'bg-emerald-100 text-emerald-800' :
+                                    dt.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-800' :
+                                      'bg-amber-100 text-amber-800'
+                                  }`}>
                                   {dt.estado}
                                 </span>
                                 {esElActivo && (
@@ -1947,21 +2120,19 @@ export default function ExpedienteCasoPage() {
                             }
                             setEtapa3PasoManual(1)
                           }}
-                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
-                            pasoInterno === 1
+                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 cursor-pointer ${pasoInterno === 1
                               ? "bg-white border-violet-500 ring-1 ring-violet-500/30 shadow-2xs"
                               : paso1Listo
                                 ? "bg-white/70 border-emerald-200 hover:bg-white"
                                 : "bg-transparent border-transparent"
-                          }`}
+                            }`}
                         >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                            pasoInterno === 1
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${pasoInterno === 1
                               ? "bg-violet-600 text-white"
                               : paso1Listo
                                 ? "bg-emerald-600 text-white"
                                 : "bg-slate-200 text-slate-600"
-                          }`}>
+                            }`}>
                             {paso1Listo && pasoInterno !== 1 ? <Check className="w-3.5 h-3.5" /> : "1"}
                           </div>
                           <div className="min-w-0">
@@ -1978,23 +2149,21 @@ export default function ExpedienteCasoPage() {
                           type="button"
                           disabled={!paso1Listo}
                           onClick={() => paso1Listo && setEtapa3PasoManual(2)}
-                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${
-                            !paso1Listo
+                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${!paso1Listo
                               ? "opacity-55 cursor-not-allowed border-transparent"
                               : pasoInterno === 2
                                 ? "bg-white border-emerald-600 ring-1 ring-emerald-600/30 shadow-2xs cursor-pointer"
                                 : paso2Listo
                                   ? "bg-white/70 border-emerald-200 hover:bg-white cursor-pointer"
                                   : "bg-white/60 border-slate-200 hover:bg-white cursor-pointer"
-                          }`}
+                            }`}
                         >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                            pasoInterno === 2
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${pasoInterno === 2
                               ? "bg-emerald-600 text-white"
                               : paso2Listo
                                 ? "bg-emerald-600 text-white"
                                 : "bg-slate-200 text-slate-600"
-                          }`}>
+                            }`}>
                             {paso2Listo && pasoInterno !== 2 ? <Check className="w-3.5 h-3.5" /> : "2"}
                           </div>
                           <div className="min-w-0">
@@ -2013,17 +2182,15 @@ export default function ExpedienteCasoPage() {
                           type="button"
                           disabled={!paso2Listo}
                           onClick={() => paso2Listo && setEtapa3PasoManual(null)}
-                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${
-                            !paso2Listo
+                          className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${!paso2Listo
                               ? "opacity-55 cursor-not-allowed border-transparent"
                               : pasoInterno === 3
                                 ? "bg-white border-[#2369A1] ring-1 ring-[#2369A1]/30 shadow-2xs cursor-pointer"
                                 : "bg-white/70 border-slate-200 hover:bg-white cursor-pointer"
-                          }`}
+                            }`}
                         >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                            paso2Listo ? "bg-[#2369A1] text-white" : "bg-slate-200 text-slate-600"
-                          }`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${paso2Listo ? "bg-[#2369A1] text-white" : "bg-slate-200 text-slate-600"
+                            }`}>
                             {paso2Listo ? <CheckCircle2 className="w-3.5 h-3.5" /> : "3"}
                           </div>
                           <div className="min-w-0">
@@ -2411,11 +2578,10 @@ export default function ExpedienteCasoPage() {
                                 return (
                                   <label
                                     key={item.key}
-                                    className={`p-2.5 rounded-lg border flex items-start gap-2.5 cursor-pointer transition-all ${
-                                      checked
+                                    className={`p-2.5 rounded-lg border flex items-start gap-2.5 cursor-pointer transition-all ${checked
                                         ? "bg-emerald-50/70 border-emerald-300"
                                         : "bg-slate-50/60 border-slate-200 hover:bg-slate-50"
-                                    }`}
+                                      }`}
                                   >
                                     <input
                                       type="checkbox"
@@ -2447,11 +2613,10 @@ export default function ExpedienteCasoPage() {
                                   setQaResultadoOperatividad("REPARADO")
                                   if (!qaObservaciones.trim()) setQaObservaciones(DEFAULT_QA_OBS_REPARADO)
                                 }}
-                                className={`p-3 rounded-lg border text-left transition-all ${
-                                  qaResultadoOperatividad === "REPARADO"
+                                className={`p-3 rounded-lg border text-left transition-all ${qaResultadoOperatividad === "REPARADO"
                                     ? "border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-600 shadow-2xs"
                                     : "border-slate-200 bg-white hover:bg-slate-50"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -2468,11 +2633,10 @@ export default function ExpedienteCasoPage() {
                                   setQaResultadoOperatividad("INOPERATIVO")
                                   if (qaObservaciones === DEFAULT_QA_OBS_REPARADO) setQaObservaciones("")
                                 }}
-                                className={`p-3 rounded-lg border text-left transition-all ${
-                                  qaResultadoOperatividad === "INOPERATIVO"
+                                className={`p-3 rounded-lg border text-left transition-all ${qaResultadoOperatividad === "INOPERATIVO"
                                     ? "border-rose-600 bg-rose-50/80 ring-1 ring-rose-600 shadow-2xs"
                                     : "border-slate-200 bg-white hover:bg-slate-50"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
                                   <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -2489,11 +2653,10 @@ export default function ExpedienteCasoPage() {
                                   setQaResultadoOperatividad("OBSERVADO")
                                   if (qaObservaciones === DEFAULT_QA_OBS_REPARADO) setQaObservaciones("")
                                 }}
-                                className={`p-3 rounded-lg border text-left transition-all ${
-                                  qaResultadoOperatividad === "OBSERVADO"
+                                className={`p-3 rounded-lg border text-left transition-all ${qaResultadoOperatividad === "OBSERVADO"
                                     ? "border-amber-600 bg-amber-50/80 ring-1 ring-amber-600 shadow-2xs"
                                     : "border-slate-200 bg-white hover:bg-slate-50"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
                                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -2572,13 +2735,12 @@ export default function ExpedienteCasoPage() {
                               type="submit"
                               size="sm"
                               disabled={guardandoQA}
-                              className={`text-white text-xs h-8.5 font-semibold shadow-xs ${
-                                qaResultadoOperatividad === "REPARADO"
+                              className={`text-white text-xs h-8.5 font-semibold shadow-xs ${qaResultadoOperatividad === "REPARADO"
                                   ? "bg-emerald-600 hover:bg-emerald-700"
                                   : qaResultadoOperatividad === "INOPERATIVO"
                                     ? "bg-rose-600 hover:bg-rose-700"
                                     : "bg-amber-600 hover:bg-amber-700"
-                              }`}
+                                }`}
                             >
                               {guardandoQA
                                 ? "Procesando..."
@@ -2598,11 +2760,10 @@ export default function ExpedienteCasoPage() {
                       {pasoInterno === 3 && osActual && (
                         <div className="space-y-4">
                           {/* Banner de estado final de taller */}
-                          <div className={`p-3.5 rounded-xl border flex items-center justify-between flex-wrap gap-2 ${
-                            osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO"
+                          <div className={`p-3.5 rounded-xl border flex items-center justify-between flex-wrap gap-2 ${osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO"
                               ? "bg-rose-50/80 border-rose-300 text-rose-950"
                               : "bg-emerald-50/80 border-emerald-300 text-emerald-950"
-                          }`}>
+                            }`}>
                             <div className="flex items-center gap-2.5">
                               {osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO" ? (
                                 <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
@@ -2676,11 +2837,10 @@ export default function ExpedienteCasoPage() {
                                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                                   2. Protocolo de Calidad (QA)
                                 </span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                  osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO"
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO"
                                     ? "bg-rose-50 text-rose-800 border-rose-200"
                                     : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                }`}>
+                                  }`}>
                                   {osActual.pruebasQA?.resultadoOperatividad === "INOPERATIVO" ? "INOPERATIVO" : "REPARADO / LISTO"}
                                 </span>
                               </div>
@@ -2766,11 +2926,10 @@ export default function ExpedienteCasoPage() {
                       {[...caso.ordenesServicio].reverse().map((os) => {
                         const esLaActiva = os.id === osActual?.id
                         return (
-                          <div 
-                            key={os.id} 
-                            className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                              esLaActiva ? "bg-violet-50/40 border-violet-200" : "bg-slate-50 border-slate-200"
-                            }`}
+                          <div
+                            key={os.id}
+                            className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${esLaActiva ? "bg-violet-50/40 border-violet-200" : "bg-slate-50 border-slate-200"
+                              }`}
                           >
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -2791,9 +2950,8 @@ export default function ExpedienteCasoPage() {
                                   </span>
                                 )}
                                 <span className="text-slate-500">• {os.tipo}</span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  os.estado === 'FINALIZADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800'
-                                }`}>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${os.estado === 'FINALIZADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800'
+                                  }`}>
                                   {os.estado}
                                 </span>
                                 {esLaActiva && (
@@ -2822,7 +2980,9 @@ export default function ExpedienteCasoPage() {
             {activeTab === "etapa4" && (
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
                 <div className="pb-3 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900">Etapa 4: Entrega, Garantía & Cierre</h3>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {esRutaSimple ? "Entrega y Cierre" : "Etapa 4: Entrega, Garantía & Cierre"}
+                  </h3>
                   <p className="text-xs text-slate-500">Coordinación de entrega con el cliente, activación de cobertura de garantía y liquidación técnica final.</p>
                 </div>
 
@@ -2882,19 +3042,43 @@ export default function ExpedienteCasoPage() {
                         {constanciaActual ? "Soporte Menor Ejecutado — Listo para Entrega y Cierre" : "Equipo Reparado y QA Conforme"}
                       </h4>
                       <p className="text-xs text-emerald-800 max-w-lg mx-auto mt-1">
-                        {constanciaActual 
+                        {constanciaActual
                           ? `Atención simple acreditada con constancia ${constanciaActual.codigoConstancia}. Procede a registrar la devolución formal al cliente.`
                           : "El equipo está 100% operativo y probado. Registre la entrega del activo al cliente para activar la garantía o proceder a la liquidación final."}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => setModalEntregaOpen(true)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 shadow-xs"
-                    >
-                      <ShieldCheck className="w-4 h-4 mr-1.5" />
-                      Registrar Entrega de Equipo
-                    </Button>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      {constanciaActual && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => abrirModalEditarConstancia(constanciaActual)}
+                            className="text-xs border-slate-300 bg-white hover:bg-slate-50 text-slate-700 gap-1.5"
+                          >
+                            <PenTool className="w-3.5 h-3.5 text-teal-700" />
+                            Editar Constancia ({constanciaActual.codigoConstancia})
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generarConstanciaAtencionPDF(caso, constanciaActual)}
+                            className="text-xs border-teal-300 bg-white hover:bg-teal-50 text-teal-900 font-semibold gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5 text-teal-700" />
+                            Constancia ({constanciaActual.codigoConstancia})
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => setModalEntregaOpen(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 shadow-xs"
+                      >
+                        <ShieldCheck className="w-4 h-4 mr-1.5" />
+                        Registrar Entrega de Equipo
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   /* Ya entregado / en garantía / cerrado */
@@ -2908,8 +3092,8 @@ export default function ExpedienteCasoPage() {
                             Equipo Entregado a Conformidad
                           </span>
                           <span className="text-[11px] text-emerald-700">
-                            {caso.entrega 
-                              ? `Receptor: ${caso.entrega.receptorNombre} (DNI/RUC: ${caso.entrega.receptorDniRuc || "N/A"})` 
+                            {caso.entrega
+                              ? `Receptor: ${caso.entrega.receptorNombre} (DNI/RUC: ${caso.entrega.receptorDniRuc || "N/A"})`
                               : `Estado de Expediente: ${caso.estado}`}
                           </span>
                         </div>
@@ -2926,15 +3110,26 @@ export default function ExpedienteCasoPage() {
                             Informe Técnico{ultimoInforme ? ` (${ultimoInforme.codigoInforme})` : " (PDF)"}
                           </Button>
                         ) : ultimaConstancia ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => generarConstanciaAtencionPDF(caso, ultimaConstancia)}
-                            className="text-xs border-teal-300 text-teal-900 bg-white hover:bg-teal-50 font-semibold gap-1.5"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-teal-600" />
-                            Constancia ({ultimaConstancia.codigoConstancia})
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => abrirModalEditarConstancia(ultimaConstancia)}
+                              className="text-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-50 gap-1.5"
+                            >
+                              <PenTool className="w-3.5 h-3.5 text-teal-700" />
+                              Editar Fecha / Hora
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => generarConstanciaAtencionPDF(caso, ultimaConstancia)}
+                              className="text-xs border-teal-300 text-teal-900 bg-white hover:bg-teal-50 font-semibold gap-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-teal-600" />
+                              Constancia ({ultimaConstancia.codigoConstancia})
+                            </Button>
+                          </>
                         ) : null}
                         {caso.estado !== "CERRADO" && (
                           <Button
@@ -3058,18 +3253,17 @@ export default function ExpedienteCasoPage() {
                 <div className="border-l-2 border-slate-200 ml-3 space-y-6 py-2">
                   {(caso.historial || []).map((h, idx) => (
                     <div key={h.id || idx} className="relative pl-6">
-                      <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${
-                        h.tipo === "APERTURA" ? "bg-[#2369A1]" :
-                        h.tipo === "INCIDENCIA" ? "bg-blue-500" :
-                        h.tipo === "DIAGNOSTICO" ? "bg-amber-500" :
-                        h.tipo === "ORDEN_SERVICIO" ? "bg-violet-500" :
-                        h.tipo === "INFORME_TECNICO" ? "bg-sky-600" :
-                        h.tipo === "ATENCION_SIMPLE" ? "bg-teal-500" :
-                        h.tipo === "GARANTIA_ACTIVADA" ? "bg-emerald-500" :
-                        h.tipo === "REINGRESO_GARANTIA" ? "bg-amber-600 animate-pulse" :
-                        h.tipo === "CIERRE" ? "bg-slate-700" :
-                        "bg-slate-400"
-                      }`} />
+                      <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${h.tipo === "APERTURA" ? "bg-[#2369A1]" :
+                          h.tipo === "INCIDENCIA" ? "bg-blue-500" :
+                            h.tipo === "DIAGNOSTICO" ? "bg-amber-500" :
+                              h.tipo === "ORDEN_SERVICIO" ? "bg-violet-500" :
+                                h.tipo === "INFORME_TECNICO" ? "bg-sky-600" :
+                                  h.tipo === "ATENCION_SIMPLE" ? "bg-teal-500" :
+                                    h.tipo === "GARANTIA_ACTIVADA" ? "bg-emerald-500" :
+                                      h.tipo === "REINGRESO_GARANTIA" ? "bg-amber-600 animate-pulse" :
+                                        h.tipo === "CIERRE" ? "bg-slate-700" :
+                                          "bg-slate-400"
+                        }`} />
                       <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3">
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="font-bold text-slate-900">{h.titulo}</span>
@@ -3160,11 +3354,10 @@ export default function ExpedienteCasoPage() {
                 <button
                   type="button"
                   onClick={() => setNuevaIncRequiereDT(true)}
-                  className={`p-2 rounded-lg border text-left transition-all ${
-                    nuevaIncRequiereDT
+                  className={`p-2 rounded-lg border text-left transition-all ${nuevaIncRequiereDT
                       ? "border-[#2369A1] bg-[#2369A1]/5 ring-1 ring-[#2369A1] text-slate-900"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-xs flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${nuevaIncRequiereDT ? "bg-[#2369A1]" : "bg-slate-300"}`} />
@@ -3176,11 +3369,10 @@ export default function ExpedienteCasoPage() {
                 <button
                   type="button"
                   onClick={() => setNuevaIncRequiereDT(false)}
-                  className={`p-2 rounded-lg border text-left transition-all ${
-                    !nuevaIncRequiereDT
+                  className={`p-2 rounded-lg border text-left transition-all ${!nuevaIncRequiereDT
                       ? "border-teal-600 bg-teal-50/80 ring-1 ring-teal-600 text-slate-900"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-xs flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${!nuevaIncRequiereDT ? "bg-teal-600" : "bg-slate-300"}`} />
@@ -3219,14 +3411,22 @@ export default function ExpedienteCasoPage() {
       {/* ========================================================================= */}
       {/* MODAL 2A: ATENCIÓN SIMPLE (CONSTANCIA) */}
       {/* ========================================================================= */}
-      <Dialog open={modalAtencionSimpleOpen} onOpenChange={setModalAtencionSimpleOpen}>
-        <DialogContent className="max-w-md font-sans">
+      <Dialog
+        open={modalAtencionSimpleOpen}
+        onOpenChange={(open) => {
+          setModalAtencionSimpleOpen(open)
+          if (!open) setConstanciaEditandoId(null)
+        }}
+      >
+        <DialogContent className="max-w-lg font-sans max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
-              2A. Atención Simple (Constancia de Atención)
+              {constanciaEditandoId
+                ? `Editar Constancia de Atención (${constanciaEditandoId})`
+                : "2A. Atención Simple (Constancia de Atención)"}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Para soporte menor (limpieza, config, reinicio). No requiere diagnóstico formal ni repuestos.
+              Ingrese manualmente la fecha y hora de inicio (ingreso) y término (salida) de la atención para reflejarlas en la Constancia de Atención.
             </DialogDescription>
           </DialogHeader>
 
@@ -3241,6 +3441,62 @@ export default function ExpedienteCasoPage() {
               </p>
             </div>
 
+            {/* Bloque de Fechas de Atención y Cuadritos Vacíos para Hora Manual */}
+            <div className="p-3 rounded-lg bg-teal-50/50 border border-teal-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-teal-900 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-teal-700" />
+                  Fechas de Atención y Cuadros de Hora (Para Firma)
+                </span>
+                <span className="text-[10px] text-teal-700 font-medium">Impreso en Constancia</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Fecha de Ingreso <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={constanciaFechaIngreso}
+                    onChange={(e) => setConstanciaFechaIngreso(e.target.value)}
+                    className="text-xs h-8.5 bg-white font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Hora de Ingreso (PDF)
+                  </Label>
+                  <div className="h-8.5 px-2.5 rounded-md border border-dashed border-slate-300 bg-white/80 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="inline-block w-14 h-4 bg-white border border-slate-500 rounded-[2px]" />
+                    <span className="text-[10px] font-medium text-slate-500">Vacío p/ llenar al firmar</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Fecha de Salida <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={constanciaFechaSalida}
+                    onChange={(e) => setConstanciaFechaSalida(e.target.value)}
+                    className="text-xs h-8.5 bg-white font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Hora de Salida (PDF)
+                  </Label>
+                  <div className="h-8.5 px-2.5 rounded-md border border-dashed border-slate-300 bg-white/80 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="inline-block w-14 h-4 bg-white border border-slate-500 rounded-[2px]" />
+                    <span className="text-[10px] font-medium text-slate-500">Vacío p/ llenar al firmar</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Ticket iTop */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -3252,7 +3508,7 @@ export default function ExpedienteCasoPage() {
               <Input
                 value={constanciaTicketItop}
                 onChange={(e) => setConstanciaTicketItop(e.target.value.toUpperCase())}
-                placeholder="Ej. R-019284, T-45810, I-8831"
+                placeholder="Ej. R-019284, T-45810, I-000904"
                 className="text-xs font-mono uppercase font-bold bg-white"
                 required
               />
@@ -3274,18 +3530,6 @@ export default function ExpedienteCasoPage() {
 
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-slate-800">
-                Falla Real (Diagnóstico Técnico Inmediato)
-              </Label>
-              <Input
-                value={constanciaFallaReal}
-                onChange={(e) => setConstanciaFallaReal(e.target.value)}
-                placeholder="Ej. Ventilador obstruido / Memoria RAM desajustada"
-                className="text-xs bg-white"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-800">
                 Resultado Técnico <span className="text-rose-500">*</span>
               </Label>
               <Input
@@ -3298,31 +3542,67 @@ export default function ExpedienteCasoPage() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-800">Observaciones</Label>
-              <Input
-                value={constanciaObservaciones}
-                onChange={(e) => setConstanciaObservaciones(e.target.value)}
-                placeholder="Ej. Ninguna / Se recomienda cambio preventivo en 6 meses"
-                className="text-xs bg-white"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-800">Técnico Responsable</Label>
-              <Input
+              <Label className="text-xs font-semibold text-slate-800">Técnico Responsable *</Label>
+              <select
                 value={constanciaTecnico}
                 onChange={(e) => setConstanciaTecnico(e.target.value)}
-                className="text-xs bg-white"
+                className="w-full text-xs h-9 rounded-md border border-slate-200 px-2.5 bg-white text-slate-800 font-medium"
                 required
-              />
+              >
+                <option value="" disabled>Seleccione al técnico responsable...</option>
+                {constanciaTecnico && !tecnicosDisponibles.includes(constanciaTecnico) && (
+                  <option value={constanciaTecnico}>{constanciaTecnico}</option>
+                )}
+                {tecnicosDisponibles.map((nombre) => (
+                  <option key={nombre} value={nombre}>
+                    {nombre}
+                  </option>
+                ))}
+              </select>
             </div>
 
+            {/* Campos opcionales plegados para no abrumar al técnico */}
+            <details className="group rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2">
+              <summary className="text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
+                Más detalles (opcional): falla real y observaciones
+              </summary>
+              <div className="space-y-3 pt-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-800">Falla Real (Diagnóstico Inmediato)</Label>
+                  <Input
+                    value={constanciaFallaReal}
+                    onChange={(e) => setConstanciaFallaReal(e.target.value)}
+                    placeholder="Ej. Ventilador obstruido / Memoria RAM desajustada"
+                    className="text-xs bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-800">Observaciones</Label>
+                  <Input
+                    value={constanciaObservaciones}
+                    onChange={(e) => setConstanciaObservaciones(e.target.value)}
+                    placeholder="Ej. Ninguna / Se recomienda cambio preventivo en 6 meses"
+                    className="text-xs bg-white"
+                  />
+                </div>
+              </div>
+            </details>
+
             <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalAtencionSimpleOpen(false)} className="text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setModalAtencionSimpleOpen(false)
+                  setConstanciaEditandoId(null)
+                }}
+                className="text-xs"
+              >
                 Cancelar
               </Button>
               <Button type="submit" size="sm" className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold">
-                Emitir y Descargar Constancia (PDF)
+                {constanciaEditandoId ? "Guardar Cambios y Descargar PDF" : "Emitir y Descargar Constancia (PDF)"}
               </Button>
             </DialogFooter>
           </form>
@@ -3450,10 +3730,10 @@ export default function ExpedienteCasoPage() {
                           setDtRequiereRepuestos(true);
                           const catalogItem = repuestosCatalogo.find(r => r.id === tpl.pn);
                           setDtRepuestosSeleccionados([
-                            { 
-                              partNumber: tpl.pn, 
-                              descripcion: catalogItem?.descripcion || tpl.partDesc || tpl.pn, 
-                              cantidad: 1 
+                            {
+                              partNumber: tpl.pn,
+                              descripcion: catalogItem?.descripcion || tpl.partDesc || tpl.pn,
+                              cantidad: 1
                             }
                           ]);
                           setRepuestoSelId(tpl.pn);
@@ -3633,9 +3913,8 @@ export default function ExpedienteCasoPage() {
                                         setBusquedaRepuesto(`[${rep.id}] ${rep.descripcion}`)
                                         setMostrarSugerencias(false)
                                       }}
-                                      className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50/80 transition-colors flex items-center justify-between gap-2 ${
-                                        repuestoSelId === rep.id ? "bg-blue-50 text-[#2369A1] font-semibold" : "text-slate-700"
-                                      }`}
+                                      className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50/80 transition-colors flex items-center justify-between gap-2 ${repuestoSelId === rep.id ? "bg-blue-50 text-[#2369A1] font-semibold" : "text-slate-700"
+                                        }`}
                                     >
                                       <div className="truncate flex-1">
                                         <span className="font-mono font-bold text-slate-900 mr-1.5">[{rep.id}]</span>
@@ -3919,22 +4198,20 @@ export default function ExpedienteCasoPage() {
               <button
                 type="button"
                 onClick={() => setDecisionAprobado(true)}
-                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${
-                  decisionAprobado 
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600 shadow-2xs" 
+                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${decisionAprobado
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600 shadow-2xs"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 ✓ APROBAR Intervención
               </button>
               <button
                 type="button"
                 onClick={() => setDecisionAprobado(false)}
-                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${
-                  !decisionAprobado 
-                    ? "border-rose-600 bg-rose-50 text-rose-800 ring-1 ring-rose-600 shadow-2xs" 
+                className={`flex-1 p-3 rounded-lg border text-xs font-semibold text-center transition-all ${!decisionAprobado
+                    ? "border-rose-600 bg-rose-50 text-rose-800 ring-1 ring-rose-600 shadow-2xs"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 ✕ RECHAZAR Presupuesto
               </button>
@@ -3987,11 +4264,10 @@ export default function ExpedienteCasoPage() {
                         <button
                           type="button"
                           onClick={() => setModoCodigoOSDecision("AUTO")}
-                          className={`p-2.5 rounded-lg border text-left transition-all ${
-                            modoCodigoOSDecision === "AUTO"
+                          className={`p-2.5 rounded-lg border text-left transition-all ${modoCodigoOSDecision === "AUTO"
                               ? "border-[#2369A1] bg-white ring-1 ring-[#2369A1] text-slate-900 shadow-2xs"
                               : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
-                          }`}
+                            }`}
                         >
                           <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
                             <span className={`w-2 h-2 rounded-full ${modoCodigoOSDecision === "AUTO" ? "bg-[#2369A1]" : "bg-slate-300"}`} />
@@ -4005,11 +4281,10 @@ export default function ExpedienteCasoPage() {
                         <button
                           type="button"
                           onClick={() => setModoCodigoOSDecision("MANUAL")}
-                          className={`p-2.5 rounded-lg border text-left transition-all ${
-                            modoCodigoOSDecision === "MANUAL"
+                          className={`p-2.5 rounded-lg border text-left transition-all ${modoCodigoOSDecision === "MANUAL"
                               ? "border-[#2369A1] bg-white ring-1 ring-[#2369A1] text-slate-900 shadow-2xs"
                               : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
-                          }`}
+                            }`}
                         >
                           <div className="font-bold flex items-center gap-1.5 text-xs text-slate-800">
                             <span className={`w-2 h-2 rounded-full ${modoCodigoOSDecision === "MANUAL" ? "bg-[#2369A1]" : "bg-slate-300"}`} />
@@ -4102,13 +4377,13 @@ export default function ExpedienteCasoPage() {
               <Button type="button" variant="outline" size="sm" onClick={() => setModalDecisionDTOpen(false)} className="text-xs">
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
-                size="sm" 
+              <Button
+                type="submit"
+                size="sm"
                 className={decisionAprobado ? "bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs" : "bg-rose-600 hover:bg-rose-700 text-white text-xs"}
               >
-                {decisionAprobado 
-                  ? (generarOSAlAprobar ? "Aprobar y Aperturar Orden de Servicio" : "Aprobar Propuesta Técnica") 
+                {decisionAprobado
+                  ? (generarOSAlAprobar ? "Aprobar y Aperturar Orden de Servicio" : "Aprobar Propuesta Técnica")
                   : "Confirmar Rechazo y Cerrar"}
               </Button>
             </DialogFooter>

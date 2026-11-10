@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { Caso, DiagnosticoTecnicoCaso } from '@/types';
 import {
+  referenciaServicioCaso,
   createMurPdfDoc,
   distributeElasticHeight,
   drawClientAndDatesBox,
@@ -9,13 +10,13 @@ import {
   drawMeasuredSection,
   drawMurFooterAllPages,
   drawMurHeader,
-  drawSignatureBoxes,
   formatDateMur,
   LabeledSectionSpec,
   measureConsideracionesHeight,
   measureLabeledSections,
   MUR_LAYOUT,
   MurHeaderOptions,
+  resolverNombreTecnico,
 } from './pdfTheme';
 
 const CONSIDERACIONES_DT =
@@ -47,8 +48,8 @@ export const generarInformeTecnicoCasoPDF = async (
   const codigoInc = incAsociada?.codigoINC || dt.incidenciaId || 'INC-001';
 
   const metaParts = [`Expediente: ${codigoCaso}`, `Incidencia: ${codigoInc}`];
-  if (caso.contratoAlquiler?.trim()) {
-    metaParts.push(`Contrato: ${caso.contratoAlquiler.trim()}`);
+  if (referenciaServicioCaso(caso)) {
+    metaParts.push(referenciaServicioCaso(caso));
   }
 
   const headerOpts: MurHeaderOptions = {
@@ -63,11 +64,14 @@ export const generarInformeTecnicoCasoPDF = async (
   const fechaIngresoRaw = incAsociada?.fecha || caso.fechaApertura || dt.fecha;
   const fechaDiagRaw = dt.fecha || new Date().toISOString();
 
+  const tecnicoDt =
+    resolverNombreTecnico(dt.tecnicoResponsable, undefined, dt.tecnicoId) || 'Laboratorio MUR';
+
   const rightRows = [
     { label: 'EXPEDIENTE:', value: `${codigoCaso} (${codigoInc})` },
     { label: 'FECHA DE INGRESO:', value: formatDateMur(fechaIngresoRaw) },
     { label: 'FECHA DIAGNÓSTICO:', value: formatDateMur(fechaDiagRaw) },
-    { label: 'TÉCNICO EVALUADOR:', value: dt.tecnicoResponsable || 'Laboratorio MUR' },
+    { label: 'TÉCNICO EVALUADOR:', value: tecnicoDt },
     { label: 'TIPIFICACIÓN:', value: dt.tipoFalla || 'HARDWARE' },
   ];
 
@@ -132,29 +136,10 @@ export const generarInformeTecnicoCasoPDF = async (
     fontFamily,
     `CONSIDERACIONES: ${CONSIDERACIONES_DT}`
   );
-  const sigReserve = esRechazado ? 23.5 + MUR_LAYOUT.boxGap : 0;
-  distributeElasticHeight(curY, measured, sigReserve + MUR_LAYOUT.boxGap + consH, 55);
+  distributeElasticHeight(curY, measured, MUR_LAYOUT.boxGap + consH, 55);
 
   for (const sec of measured) {
     curY = drawMeasuredSection(doc, fontFamily, curY, sec, headerOpts);
-  }
-
-  if (esRechazado) {
-    const esAlquiler = caso.origen === 'ALQUILER' || Boolean(caso.contratoAlquiler?.trim());
-    curY = drawSignatureBoxes(
-      doc,
-      fontFamily,
-      curY,
-      {
-        leftTitle: 'LABORATORIO DE HARDWARE',
-        leftPrimary: dt.tecnicoResponsable || 'Especialista Técnico',
-        leftSecondary: 'MUR Tecnología S.A.C.',
-        rightTitle: esAlquiler ? 'USUARIO' : 'CONFORMIDAD DE CLIENTE',
-        rightPrimary: caso.cliente.contacto || caso.cliente.razonSocial,
-        rightSecondary: !esAlquiler && caso.cliente.ruc ? `RUC/DNI: ${caso.cliente.ruc}` : undefined,
-      },
-      headerOpts
-    );
   }
 
   drawConsideracionesBox(doc, fontFamily, curY, 'CONSIDERACIONES:', CONSIDERACIONES_DT, headerOpts);

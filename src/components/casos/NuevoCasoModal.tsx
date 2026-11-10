@@ -37,9 +37,10 @@ import {
 import { toast } from "sonner"
 import { useAuth } from "@/context/AuthContext"
 import { getAllClientes, createCliente } from "@/services/clienteService"
+import { getAllServiciosCliente, etiquetaReferenciaServicio, diasRestantesServicio } from "@/services/servicioService"
 import { getAllModelos, createModelo } from "@/services/modeloService"
 import { verificarExpedienteActivoEquipo, crearNuevoCaso, registrarNuevaIncidencia } from "@/services/casoService"
-import { Caso, Cliente, ModeloEquipo, OrigenIncidencia, PrioridadIncidencia } from "@/types"
+import { Caso, Cliente, ModeloEquipo, OrigenIncidencia, PrioridadIncidencia, ServicioContrato, TipoContratacion } from "@/types"
 
 interface NuevoCasoModalProps {
   children?: React.ReactNode
@@ -105,6 +106,13 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   const [contratoAlquiler, setContratoAlquiler] = useState("")
   const [modoEditarCliente, setModoEditarCliente] = useState(false)
 
+  // Servicio contratado (licitación / contrato / OS del cliente)
+  const [servicios, setServicios] = useState<ServicioContrato[]>([])
+  const [servicioSelId, setServicioSelId] = useState("")
+  const [tipoContratacionManual, setTipoContratacionManual] = useState<TipoContratacion>("OS")
+  const [ordenServicioClienteManual, setOrdenServicioClienteManual] = useState("")
+  const [verFinalizados, setVerFinalizados] = useState(false)
+
   // Cliente Inline rápido
   const [creandoCliente, setCreandoCliente] = useState(false)
   const [nuevoClienteRazon, setNuevoClienteRazon] = useState("")
@@ -122,6 +130,7 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
     if (open) {
       setCurrentStep(1)
       getAllClientes().then(setClientes).catch(console.error)
+      getAllServiciosCliente().then(setServicios).catch(console.error)
       getAllModelos().then(setModelos).catch(console.error)
     }
   }, [open])
@@ -174,6 +183,9 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   // Selección automática y en lote de Cliente (Razón Social, RUC, Contacto, Teléfono, Correo)
   const handleSeleccionarCliente = (id: string) => {
     setClienteId(id)
+    setServicioSelId("")
+    setContratoAlquiler("")
+    setOrdenServicioClienteManual("")
     if (!id) {
       setRazonSocial("")
       setRuc("")
@@ -198,9 +210,10 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
     if (encontrado) {
       setRazonSocial(encontrado.razonSocial)
       setRuc(encontrado.ruc)
-      setContacto(encontrado.contacto || encontrado.nombreContacto || "")
-      setTelefono(encontrado.telefono || "")
-      setCorreo(encontrado.correo || "")
+      const principal = encontrado.contactos?.find(c => c.principal) || encontrado.contactos?.[0]
+      setContacto(encontrado.contacto || encontrado.nombreContacto || principal?.nombre || "")
+      setTelefono(encontrado.telefono || principal?.telefono || "")
+      setCorreo(encontrado.correo || principal?.correo || "")
       setModoEditarCliente(false)
       toast.success(`Datos de ${encontrado.razonSocial} autocompletados correctamente.`)
     }
@@ -293,6 +306,20 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   }
 
   // Validaciones por paso
+  const clienteCatalogo = clientes.find(c => (c.id || c.ruc) === clienteId || (clienteId && c.ruc === clienteId))
+  const serviciosDelCliente = servicios.filter(s => clienteCatalogo?.id && s.clienteId === clienteCatalogo.id)
+  const serviciosVisibles = serviciosDelCliente.filter(s => verFinalizados || s.estado === "ACTIVO" || s.id === servicioSelId)
+  const servicioSeleccionado = servicios.find(s => s.id === servicioSelId)
+  const contactosCliente = clienteCatalogo?.contactos?.filter(c => c.nombre?.trim()) || []
+
+  const handleSeleccionarContacto = (idx: string) => {
+    const c = contactosCliente[Number(idx)]
+    if (!c) return
+    setContacto(c.nombre)
+    setTelefono(c.telefono || "")
+    setCorreo(c.correo || "")
+  }
+
   const validarPaso1 = () => {
     if (!serie.trim()) {
       toast.error("Por favor ingrese el número de serie (S/N) del equipo.")
@@ -306,12 +333,12 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
   }
 
   const validarPaso2 = () => {
-    if (!razonSocial.trim() || !ruc.trim()) {
+    if (!razonSocial.trim() || (!ruc.trim() && !clienteCatalogo)) {
       toast.error("Por favor seleccione un cliente o complete Razón Social y RUC.")
       return false
     }
-    if (origen === "ALQUILER" && !contratoAlquiler.trim()) {
-      toast.error("Por favor ingrese el número de contrato de alquiler.")
+    if (origen === "ALQUILER" && !servicioSeleccionado && !contratoAlquiler.trim() && !ordenServicioClienteManual.trim()) {
+      toast.error("Seleccione el servicio contratado o ingrese el N° de contrato / N° de OS del cliente.")
       return false
     }
     return true
@@ -374,7 +401,16 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
           partNumber: partNumber.trim()
         },
         origen,
-        contratoAlquiler: origen === "ALQUILER" ? contratoAlquiler.trim() : undefined,
+        contratoAlquiler: origen === "ALQUILER"
+          ? (servicioSeleccionado?.numeroContrato || contratoAlquiler.trim() || undefined)
+          : undefined,
+        servicioId: origen === "ALQUILER" ? servicioSeleccionado?.id : undefined,
+        tipoContratacion: origen === "ALQUILER"
+          ? (servicioSeleccionado?.tipoContratacion || tipoContratacionManual)
+          : undefined,
+        ordenServicioCliente: origen === "ALQUILER"
+          ? (servicioSeleccionado?.ordenServicioCliente || ordenServicioClienteManual.trim() || undefined)
+          : undefined,
         responsableApertura: `${operadorNombre} (${operadorCorreo})`,
         incidenciaInicial: {
           descripcion: descripcionAveria.trim(),
@@ -944,6 +980,21 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                           <span className="text-slate-800 truncate block">{correo || "N/A"}</span>
                         </div>
                       </div>
+                      {contactosCliente.length > 1 && (
+                        <div className="pt-2 border-t border-blue-100 space-y-1">
+                          <span className="text-[10px] text-slate-500 font-medium">Contacto que solicita (cargo):</span>
+                          <select
+                            defaultValue=""
+                            onChange={(e) => handleSeleccionarContacto(e.target.value)}
+                            className="w-full text-xs h-8 rounded-md border border-slate-200 bg-white px-2 text-slate-800"
+                          >
+                            <option value="" disabled>Cambiar contacto...</option>
+                            {contactosCliente.map((c, i) => (
+                              <option key={i} value={i}>{c.nombre}{c.cargo ? ` — ${c.cargo}` : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     /* Campos Editables de Cliente */
@@ -1041,9 +1092,9 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                       >
                         <div className="font-bold text-xs flex items-center gap-1.5 text-slate-800">
                           <span className={`w-2 h-2 rounded-full ${origen === "ALQUILER" ? "bg-[#2369A1]" : "bg-slate-300"}`} />
-                          Alquiler Corporativo
+                          Servicio Contratado (Licitación)
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Activo bajo contrato de alquiler</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Contrato u OS del cliente vigente</p>
                       </button>
 
                       <button
@@ -1064,17 +1115,95 @@ export function NuevoCasoModal({ children, onSuccess }: NuevoCasoModalProps) {
                     </div>
 
                     {origen === "ALQUILER" && (
-                      <div className="space-y-1 bg-blue-50/40 p-2.5 rounded-lg border border-blue-200 mt-1">
-                        <Label className="text-xs font-semibold text-blue-900">
-                          N° Contrato de Alquiler <span className="text-rose-500">*</span>
-                        </Label>
-                        <Input
-                          placeholder="Ej. CTR-ALQ-2026-088"
-                          value={contratoAlquiler}
-                          onChange={(e) => setContratoAlquiler(e.target.value)}
-                          className="text-xs font-mono bg-white h-8"
-                          required
-                        />
+                      <div className="space-y-2.5 bg-blue-50/40 p-3 rounded-lg border border-blue-200 mt-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold text-blue-900">
+                            Servicio contratado (Licitación / Contrato / OS del cliente) <span className="text-rose-500">*</span>
+                          </Label>
+                          {serviciosDelCliente.some(s => s.estado !== "ACTIVO") && (
+                            <label className="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" checked={verFinalizados} onChange={(e) => setVerFinalizados(e.target.checked)} />
+                              Ver finalizados
+                            </label>
+                          )}
+                        </div>
+
+                        {serviciosVisibles.length > 0 && (
+                          <select
+                            value={servicioSelId}
+                            onChange={(e) => {
+                              setServicioSelId(e.target.value)
+                              const s = servicios.find(x => x.id === e.target.value)
+                              setContratoAlquiler(s?.numeroContrato || "")
+                            }}
+                            className="w-full text-xs h-9 rounded-md border border-slate-200 bg-white px-3 text-slate-800"
+                          >
+                            <option value="">-- Seleccionar servicio del cliente --</option>
+                            {serviciosVisibles.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {etiquetaReferenciaServicio(s) || s.id} · {s.objeto} · {s.estado === "ACTIVO" ? "Activo" : "Finalizado"}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {servicioSeleccionado ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-white border border-blue-100 rounded-md p-2">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">Tipo</span>
+                              <span className="font-semibold text-slate-800">{servicioSeleccionado.tipoContratacion}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">N° Contrato / Resolución</span>
+                              <span className="font-mono font-bold text-slate-800">{servicioSeleccionado.numeroContrato || "—"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">N° OS del Cliente</span>
+                              <span className="font-mono font-bold text-[#2369A1]">{servicioSeleccionado.ordenServicioCliente || "—"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">Vigencia</span>
+                              <span className="text-slate-800">
+                                {servicioSeleccionado.fechaFin}
+                                {servicioSeleccionado.estado === "ACTIVO" && ` (${diasRestantesServicio(servicioSeleccionado.fechaFin)} d)`}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] text-slate-500">
+                              {serviciosVisibles.length === 0
+                                ? "Este cliente no tiene servicios activos registrados. Ingrese la referencia manualmente:"
+                                : "O ingrese la referencia manualmente:"}
+                            </p>
+                            <div className="grid grid-cols-3 gap-2">
+                              <select
+                                value={tipoContratacionManual}
+                                onChange={(e) => setTipoContratacionManual(e.target.value as TipoContratacion)}
+                                className="text-xs h-8 rounded-md border border-slate-200 bg-white px-2"
+                              >
+                                <option value="OS">Orden de Servicio</option>
+                                <option value="CONTRATO">Contrato</option>
+                                <option value="RESOLUCION">Resolución</option>
+                              </select>
+                              <Input
+                                placeholder="N° Contrato"
+                                value={contratoAlquiler}
+                                onChange={(e) => setContratoAlquiler(e.target.value)}
+                                className="text-xs font-mono bg-white h-8"
+                              />
+                              <Input
+                                placeholder="N° OS del cliente"
+                                value={ordenServicioClienteManual}
+                                onChange={(e) => setOrdenServicioClienteManual(e.target.value)}
+                                className="text-xs font-mono bg-white h-8"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400">
+                          La N° OS del cliente es independiente de la OS-XXXXXX interna que se genera en la intervención técnica.
+                        </p>
                       </div>
                     )}
                   </div>

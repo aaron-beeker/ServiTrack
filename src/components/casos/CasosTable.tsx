@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Caso } from "@/types"
+import { referenciaServicioCaso } from "@/lib/pdf/pdfTheme"
 import {
   suscribirCasos,
   getCasos,
@@ -111,6 +112,7 @@ export function CasosTable({ onSelectCaso, filtroEstadoInicial = "TODOS" }: Caso
       caso.cliente.ruc.includes(q) ||
       caso.equipo.modelo.toLowerCase().includes(q) ||
       (caso.contratoAlquiler && caso.contratoAlquiler.toLowerCase().includes(q)) ||
+      (caso.ordenServicioCliente && caso.ordenServicioCliente.toLowerCase().includes(q)) ||
       Boolean(caso.incidencias?.some(i => i.codigoINC.toLowerCase().includes(q))) ||
       Boolean(caso.diagnosticos?.some(d => d.codigoDT.toLowerCase().includes(q))) ||
       Boolean(caso.ordenesServicio?.some(o => o.codigoOS.toLowerCase().includes(q))) ||
@@ -297,9 +299,9 @@ export function CasosTable({ onSelectCaso, filtroEstadoInicial = "TODOS" }: Caso
                         <span className="text-[11px] text-slate-400">
                           RUC: {caso.cliente.ruc}
                         </span>
-                        {caso.contratoAlquiler && (
-                          <span className="text-[10px] text-purple-700 font-mono font-medium truncate" title={caso.contratoAlquiler}>
-                            CTR: {caso.contratoAlquiler}
+                        {(caso.contratoAlquiler || caso.ordenServicioCliente) && (
+                          <span className="text-[10px] text-purple-700 font-mono font-medium truncate" title={referenciaServicioCaso(caso)}>
+                            {referenciaServicioCaso(caso)}
                           </span>
                         )}
                       </div>

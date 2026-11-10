@@ -1,7 +1,125 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
-import { ClienteOrden, EquipoOrden } from '@/types';
+import { ClienteOrden, EquipoOrden, UsuarioSistema } from '@/types';
 import { MUR_MARK_DATA_URI } from './murLogoAsset';
+
+let cachedUsuariosForPdf: UsuarioSistema[] = [
+  {
+    id: 'beeker147',
+    nombreCompleto: 'Beeker Aarón Valdéz Mattos',
+    correo: 'beeker147@gmail.com',
+    rol: 'ADMIN',
+    cargo: 'Administrador de Operaciones y TI',
+    activo: true,
+  },
+  {
+    id: 'beeker.valdez',
+    nombreCompleto: 'Beeker Aarón Valdéz Mattos',
+    correo: 'aarón.valdez@murtecnologia.com',
+    rol: 'ADMIN',
+    cargo: 'Jefatura de Operaciones',
+    activo: true,
+  },
+  {
+    id: 'kevin.tecnico',
+    nombreCompleto: 'Kevin Ochoa',
+    correo: 'kevin.soporte@murtecnologia.com',
+    rol: 'TECNICO',
+    cargo: 'Técnico de Campo y Taller',
+    activo: true,
+  },
+  {
+    id: 'maria.ventas',
+    nombreCompleto: 'María Elena Torres',
+    correo: 'ventas@murtecnologia.com',
+    rol: 'VENTAS',
+    cargo: 'Asesora Comercial y Ventas',
+    activo: true,
+  },
+];
+
+export function setCachedUsuariosSistema(usuarios: UsuarioSistema[]): void {
+  if (Array.isArray(usuarios) && usuarios.length > 0) {
+    cachedUsuariosForPdf = usuarios;
+  }
+}
+
+export function getCachedUsuariosSistema(): UsuarioSistema[] {
+  return cachedUsuariosForPdf;
+}
+
+const normUserStr = (val?: string | null): string =>
+  (val || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+
+const ALIAS_POR_USUARIO_ID: Record<string, string[]> = {
+  'kevin.tecnico': [
+    'kevin quispe',
+    'kebin quispe',
+    'kevin ochoa',
+    'kebin ochoa',
+    'kevin.tecnico',
+    'kevin.soporte@murtecnologia.com',
+  ],
+};
+
+export function resolverUsuarioTecnico(
+  nombreOId?: string | null,
+  usuarios?: UsuarioSistema[],
+  tecnicoId?: string | null
+): { tecnicoId?: string; nombreCompleto: string } {
+  const lista = usuarios && usuarios.length > 0 ? usuarios : cachedUsuariosForPdf;
+  const idLimpio = (tecnicoId || '').trim();
+  const normInput = normUserStr(nombreOId);
+
+  if (idLimpio) {
+    const porId = lista.find(
+      (u) => u.id === idLimpio || normUserStr(u.id) === normUserStr(idLimpio)
+    );
+    if (porId) {
+      return { tecnicoId: porId.id, nombreCompleto: porId.nombreCompleto };
+    }
+  }
+
+  if (normInput) {
+    for (const u of lista) {
+      const aliases = ALIAS_POR_USUARIO_ID[u.id] || [];
+      if (
+        normInput === normUserStr(u.id) ||
+        normInput === normUserStr(u.correo) ||
+        normInput === normUserStr(u.nombreCompleto) ||
+        aliases.includes(normInput)
+      ) {
+        return { tecnicoId: u.id, nombreCompleto: u.nombreCompleto };
+      }
+    }
+
+    if (normInput === 'kevin quispe' || normInput === 'kebin quispe') {
+      const kevinUser = lista.find((u) => u.id === 'kevin.tecnico');
+      return {
+        tecnicoId: 'kevin.tecnico',
+        nombreCompleto: kevinUser?.nombreCompleto || 'Kevin Ochoa',
+      };
+    }
+  }
+
+  return {
+    ...(idLimpio ? { tecnicoId: idLimpio } : {}),
+    nombreCompleto: (nombreOId || '').trim() || 'Especialista Técnico',
+  };
+}
+
+export function resolverNombreTecnico(
+  nombreOId?: string | null,
+  usuarios?: UsuarioSistema[],
+  tecnicoId?: string | null
+): string {
+  return resolverUsuarioTecnico(nombreOId, usuarios, tecnicoId).nombreCompleto;
+}
 
 /**
  * Paleta corporativa minimalista MUR Tecnología S.A.C.
@@ -121,19 +239,47 @@ export async function createMurPdfDoc(): Promise<{ doc: jsPDF; fontFamily: strin
 
 export function formatDateMur(val?: string | null, fallback = 'N/A'): string {
   if (!val) return fallback;
+  const raw = String(val).trim();
+  if (!raw) return fallback;
+
+  // Formato manual YYYY-MM-DD (sin desfase de zona horaria UTC)
+  const mIsoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (mIsoDate) {
+    return `${mIsoDate[3]}/${mIsoDate[2]}/${mIsoDate[1]}`;
+  }
+
+  // Formato manual D/M/YYYY o DD/MM/YYYY
+  const mSlashDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mSlashDate) {
+    return `${mSlashDate[1].padStart(2, '0')}/${mSlashDate[2].padStart(2, '0')}/${mSlashDate[3]}`;
+  }
+
   try {
-    return format(new Date(val), 'dd/MM/yyyy');
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return format(d, 'dd/MM/yyyy');
   } catch {
-    return String(val);
+    return raw;
   }
 }
 
-export function formatTimeMur(val?: string | null): string {
-  if (!val) return '';
+export function formatTimeMur(val?: string | null, fallback = ''): string {
+  if (!val) return fallback;
+  const raw = String(val).trim();
+  if (!raw) return fallback;
+
+  // Formato manual HH:mm (ej. "08:40", "10:20")
+  const mTime = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (mTime) {
+    return `${mTime[1].padStart(2, '0')}:${mTime[2]}`;
+  }
+
   try {
-    return format(new Date(val), 'HH:mm');
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, 'HH:mm');
   } catch {
-    return '';
+    return fallback;
   }
 }
 
@@ -252,6 +398,8 @@ export function drawMinimalBox(
 export interface KeyValueRow {
   label: string;
   value: string;
+  /** Si es true, dibuja un recuadro en blanco (cuadrito) para que el técnico escriba la hora a mano al firmar. */
+  blankTimeBox?: boolean;
 }
 
 /**
@@ -272,8 +420,9 @@ export function drawClientAndDatesBox(
     { label: 'CORREO:', value: cliente.correo || 'N/A' },
   ];
 
+  const hasBlankTimeBox = rightRows.some((r) => r.blankTimeBox);
   const fontSize = 8.7;
-  const lineH = 4.35;
+  const lineH = hasBlankTimeBox ? 4.65 : 4.35;
   const padTop = 3.6;
   const padBottom = 3.2;
 
@@ -298,7 +447,9 @@ export function drawClientAndDatesBox(
     const vx = Math.max(MUR_LAYOUT.col2ValueX, MUR_LAYOUT.col2LabelX + lw);
     const availW = Math.max(22, rightMaxX - vx);
     doc.setFont(fontFamily, 'normal');
-    const lines = doc.splitTextToSize(row.value || 'N/A', availW) as string[];
+    const lines = row.blankTimeBox
+      ? ['']
+      : (doc.splitTextToSize(row.value || 'N/A', availW) as string[]);
     return { ...row, vx, lines };
   });
 
@@ -332,11 +483,23 @@ export function drawClientAndDatesBox(
     doc.setTextColor(...MUR_COLORS.black);
     doc.text(r.label, MUR_LAYOUT.col2LabelX, ry);
 
-    doc.setFont(fontFamily, 'normal');
-    doc.setTextColor(...MUR_COLORS.black);
-    r.lines.forEach((ln, idx) => {
-      doc.text(ln, r.vx, ry + idx * lineH);
-    });
+    if (r.blankTimeBox) {
+      // Cuadrito en blanco para anotar manualmente la hora al momento de firmar
+      const boxW = 26.0;
+      const boxH = 3.8;
+      const boxY = ry - 2.9;
+      doc.setFillColor(...MUR_COLORS.white);
+      doc.setDrawColor(...MUR_COLORS.border);
+      doc.setLineWidth(0.24);
+      doc.rect(r.vx, boxY, boxW, boxH, 'FD');
+    } else {
+      doc.setFont(fontFamily, 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...MUR_COLORS.black);
+      r.lines.forEach((ln, idx) => {
+        doc.text(ln, r.vx, ry + idx * lineH);
+      });
+    }
     ry += Math.max(1, r.lines.length) * lineH;
   }
 
@@ -779,3 +942,17 @@ export function drawMurFooterAllPages(doc: jsPDF, fontFamily: string): void {
     }
   }
 }
+
+/** Referencia estándar del servicio contratado: "Contrato 005-2026 · OS Cliente 224" (vacío si no aplica). */
+export const referenciaServicioCaso = (caso: {
+  contratoAlquiler?: string;
+  tipoContratacion?: string;
+  ordenServicioCliente?: string;
+}): string => {
+  const partes: string[] = [];
+  const ctr = caso.contratoAlquiler?.trim();
+  if (ctr) partes.push(`${caso.tipoContratacion === 'RESOLUCION' ? 'Resolución' : 'Contrato'} ${ctr}`);
+  const os = caso.ordenServicioCliente?.trim();
+  if (os) partes.push(`OS Cliente ${os}`);
+  return partes.join(' · ');
+};
