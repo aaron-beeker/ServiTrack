@@ -9,6 +9,7 @@ import {
   registrarAtencionSimple,
   actualizarConstanciaAtencion,
   registrarDiagnosticoTecnico,
+  actualizarDiagnosticoTecnico,
   registrarDecisionPropuestaTecnica,
   guardarIntervencionTecnicaOS,
   registrarPruebasQAyFinalizarOS,
@@ -75,6 +76,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   PenTool,
+  Pencil,
   CheckCircle,
   History,
   Sparkles,
@@ -134,6 +136,7 @@ export default function ExpedienteCasoPage() {
   const [constanciaTecnico, setConstanciaTecnico] = useState("")
 
   // Formulario: Diagnóstico Técnico (DT)
+  const [dtEditandoId, setDtEditandoId] = useState<string | null>(null)
   const [dtTipoFalla, setDtTipoFalla] = useState<"HARDWARE" | "SOFTWARE" | "OPERATIVO">("HARDWARE")
   const [dtHallazgos, setDtHallazgos] = useState("")
   const [dtDetalle, setDtDetalle] = useState("")
@@ -500,6 +503,38 @@ export default function ExpedienteCasoPage() {
     }
   }
 
+  const abrirModalNuevoDiagnostico = () => {
+    setDtEditandoId(null)
+    setDtTipoFalla("HARDWARE")
+    setDtHallazgos("")
+    setDtDetalle("")
+    setDtDanosFisicos("")
+    setDtRecomendaciones("")
+    setDtRequiereRepuestos(false)
+    setDtRepuestosSeleccionados([])
+    setDtTecnico(operadorNombre || "")
+    setRepuestoSelId("")
+    setRepuestoCantidad(1)
+    setBusquedaRepuesto("")
+    setModalDiagnosticoOpen(true)
+  }
+
+  const abrirModalEditarDiagnostico = (dt: DiagnosticoTecnicoCaso) => {
+    setDtEditandoId(dt.id || dt.codigoDT)
+    setDtTipoFalla(dt.tipoFalla || "HARDWARE")
+    setDtHallazgos(dt.hallazgos || "")
+    setDtDetalle(dt.diagnosticoDetallado || "")
+    setDtDanosFisicos(dt.danosFisicos || "")
+    setDtRecomendaciones(dt.solucionPropuesta || dt.recomendaciones || "")
+    setDtRequiereRepuestos(!!dt.requiereRepuestos)
+    setDtRepuestosSeleccionados(dt.repuestosRequeridos || [])
+    setDtTecnico(dt.tecnicoResponsable || operadorNombre || "")
+    setRepuestoSelId("")
+    setRepuestoCantidad(1)
+    setBusquedaRepuesto("")
+    setModalDiagnosticoOpen(true)
+  }
+
   const handleGuardarDiagnostico = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!dtDetalle.trim() || !dtHallazgos.trim()) {
@@ -513,34 +548,63 @@ export default function ExpedienteCasoPage() {
     try {
       const incActual = caso?.incidencias?.[caso.incidencias.length - 1] || caso?.incidencias?.[0]
       const tecElegido = resolverNombreTecnico(dtTecnico || operadorNombre, usuarios)
-      const nuevoDt = await registrarDiagnosticoTecnico(codigo, {
-        incidenciaId: incActual?.id,
-        tecnicoResponsable: tecElegido,
-        tipoFalla: dtTipoFalla,
-        hallazgos: dtHallazgos,
-        diagnosticoDetallado: dtDetalle,
-        danosFisicos: dtDanosFisicos,
-        requiereRepuestos: dtRequiereRepuestos,
-        repuestosRequeridos: dtRepuestosSeleccionados,
-        recomendaciones: dtRecomendaciones,
-        solucionPropuesta: dtRecomendaciones
-      })
-      toast.success(`Diagnóstico ${nuevoDt.codigoDT} registrado en expediente. Estado: DIAGNOSTICADO.`)
-      setModalDiagnosticoOpen(false)
-      setDtHallazgos("")
-      setDtDetalle("")
-      setDtDanosFisicos("")
-      setDtRecomendaciones("")
-      setDtRequiereRepuestos(false)
-      setDtRepuestosSeleccionados([])
-      setRepuestoSelId("")
-      setRepuestoCantidad(1)
-      setBusquedaRepuesto("")
-      if (caso) {
-        generarInformeTecnicoCasoPDF({ ...caso, estado: 'DIAGNOSTICADO' }, nuevoDt)
+
+      if (dtEditandoId) {
+        const dtActualizado = await actualizarDiagnosticoTecnico(codigo, dtEditandoId, {
+          tecnicoResponsable: tecElegido,
+          tipoFalla: dtTipoFalla,
+          hallazgos: dtHallazgos,
+          diagnosticoDetallado: dtDetalle,
+          danosFisicos: dtDanosFisicos,
+          requiereRepuestos: dtRequiereRepuestos,
+          repuestosRequeridos: dtRepuestosSeleccionados,
+          recomendaciones: dtRecomendaciones,
+          solucionPropuesta: dtRecomendaciones,
+          autorModificacion: operadorNombre
+        })
+        toast.success(`Diagnóstico ${dtActualizado.codigoDT} actualizado con éxito.`)
+        setModalDiagnosticoOpen(false)
+        setDtEditandoId(null)
+
+        if (caso) {
+          const diagnosticosActualizados = (caso.diagnosticos || []).map(d =>
+            (d.id === dtEditandoId || d.codigoDT === dtEditandoId) ? dtActualizado : d
+          )
+          const casoActualizado = { ...caso, diagnosticos: diagnosticosActualizados }
+          setCaso(casoActualizado)
+          generarInformeTecnicoCasoPDF(casoActualizado, dtActualizado)
+        }
+      } else {
+        const nuevoDt = await registrarDiagnosticoTecnico(codigo, {
+          incidenciaId: incActual?.id,
+          tecnicoResponsable: tecElegido,
+          tipoFalla: dtTipoFalla,
+          hallazgos: dtHallazgos,
+          diagnosticoDetallado: dtDetalle,
+          danosFisicos: dtDanosFisicos,
+          requiereRepuestos: dtRequiereRepuestos,
+          repuestosRequeridos: dtRepuestosSeleccionados,
+          recomendaciones: dtRecomendaciones,
+          solucionPropuesta: dtRecomendaciones
+        })
+        toast.success(`Diagnóstico ${nuevoDt.codigoDT} registrado en expediente. Estado: DIAGNOSTICADO.`)
+        setModalDiagnosticoOpen(false)
+        setDtEditandoId(null)
+        setDtHallazgos("")
+        setDtDetalle("")
+        setDtDanosFisicos("")
+        setDtRecomendaciones("")
+        setDtRequiereRepuestos(false)
+        setDtRepuestosSeleccionados([])
+        setRepuestoSelId("")
+        setRepuestoCantidad(1)
+        setBusquedaRepuesto("")
+        if (caso) {
+          generarInformeTecnicoCasoPDF({ ...caso, estado: 'DIAGNOSTICADO' }, nuevoDt)
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || "Error al registrar diagnóstico.")
+      toast.error(err.message || "Error al registrar o actualizar diagnóstico.")
     }
   }
 
@@ -1769,7 +1833,7 @@ export default function ExpedienteCasoPage() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => setModalDiagnosticoOpen(true)}
+                    onClick={() => abrirModalNuevoDiagnostico()}
                     className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs h-8 gap-1.5 shadow-xs font-semibold"
                   >
                     <PenTool className="w-3.5 h-3.5" />
@@ -1793,7 +1857,7 @@ export default function ExpedienteCasoPage() {
                     <div className="flex items-center justify-center gap-3 pt-2">
                       <Button
                         size="sm"
-                        onClick={() => setModalDiagnosticoOpen(true)}
+                        onClick={() => abrirModalNuevoDiagnostico()}
                         className="bg-[#2369A1] hover:bg-[#1E578A] text-white text-xs font-semibold shadow-xs"
                       >
                         <PenTool className="w-3.5 h-3.5 mr-1.5" />
@@ -1829,15 +1893,26 @@ export default function ExpedienteCasoPage() {
                           </span>
                         </div>
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => generarInformeTecnicoCasoPDF(caso, dtActual)}
-                          className="text-xs h-7.5 border-slate-300 text-slate-700 gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5 text-[#2369A1]" />
-                          Informe DT (PDF)
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => abrirModalEditarDiagnostico(dtActual)}
+                            className="text-xs h-7.5 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 gap-1.5 font-medium transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                            Editar Diagnóstico
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generarInformeTecnicoCasoPDF(caso, dtActual)}
+                            className="text-xs h-7.5 border-slate-300 text-slate-700 gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5 text-[#2369A1]" />
+                            Informe DT (PDF)
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-slate-100">
@@ -3613,7 +3688,12 @@ export default function ExpedienteCasoPage() {
       {/* ========================================================================= */}
       {/* MODAL 2B: DIAGNÓSTICO TÉCNICO FORMAL (DT) */}
       {/* ========================================================================= */}
-      <Dialog open={modalDiagnosticoOpen} onOpenChange={setModalDiagnosticoOpen}>
+      {/* MODAL 2B: REGISTRAR / EDITAR DIAGNÓSTICO TÉCNICO FORMAL (DT)               */}
+      {/* ========================================================================= */}
+      <Dialog open={modalDiagnosticoOpen} onOpenChange={(open) => {
+        setModalDiagnosticoOpen(open)
+        if (!open) setDtEditandoId(null)
+      }}>
         <DialogContent className="sm:max-w-[760px] w-full max-h-[92vh] flex flex-col bg-white border border-slate-200 text-slate-800 p-0 overflow-hidden shadow-2xl rounded-2xl font-sans">
           {/* Cabecera Fija */}
           <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
@@ -3624,7 +3704,7 @@ export default function ExpedienteCasoPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-base font-bold text-slate-900 tracking-tight">
-                    2B. Evaluación y Diagnóstico Técnico (DT)
+                    {dtEditandoId ? `Editar Diagnóstico Técnico (${dtEditandoId})` : "2B. Evaluación y Diagnóstico Técnico (DT)"}
                   </DialogTitle>
                   {ultimaInc && (
                     <span className="text-xs font-mono font-bold text-[#2369A1] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -3633,7 +3713,9 @@ export default function ExpedienteCasoPage() {
                   )}
                 </div>
                 <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                  {ultimaInc ? (
+                  {dtEditandoId ? (
+                    <span>Modifique el análisis de laboratorio, descarte de fallas, repuestos o conclusión del informe emitido.</span>
+                  ) : ultimaInc ? (
                     <span>Evaluando incidencia activa: <strong className="text-slate-700">{ultimaInc.descripcion}</strong></span>
                   ) : (
                     "Genera dictamen formal de laboratorio, causa raíz y requerimiento de repuestos."
@@ -3799,24 +3881,27 @@ export default function ExpedienteCasoPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Diagnóstico Detallado *</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-800">Diagnóstico Detallado *</Label>
+                  <span className="text-[10px] text-slate-500">Pruebas realizadas, componentes descartados y mediciones</span>
+                </div>
                 <textarea
                   value={dtDetalle}
                   onChange={(e) => setDtDetalle(e.target.value)}
-                  placeholder="Descripción técnica exhaustiva del problema y pruebas de descarte..."
-                  rows={2}
-                  className="w-full text-xs border border-slate-200 rounded-md p-2 bg-white resize-none"
+                  placeholder="Descripción técnica exhaustiva del problema, mediciones, descarte y pruebas de laboratorio realizadas..."
+                  rows={5}
+                  className="w-full text-xs border border-slate-300 rounded-lg p-3 bg-white text-slate-800 leading-relaxed focus:border-[#2369A1] focus:ring-1 focus:ring-[#2369A1] resize-y min-h-[110px] shadow-2xs font-normal"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Falla Real (Causa Raíz / Conclusión) *</Label>
+                <Label className="text-xs font-semibold text-slate-800">Falla Real (Causa Raíz / Conclusión) *</Label>
                 <Input
                   value={dtHallazgos}
                   onChange={(e) => setDtHallazgos(e.target.value)}
                   placeholder="Ej. Cortocircuito en línea de 19V / Mosfet dañado"
-                  className="text-xs h-8.5 bg-white"
+                  className="text-xs h-8.5 bg-white border-slate-300"
                   required
                 />
               </div>
@@ -4182,8 +4267,19 @@ export default function ExpedienteCasoPage() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setModalDiagnosticoOpen(false)} className="text-xs">
                   Cancelar
                 </Button>
-                <Button type="submit" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs">
-                  Guardar Diagnóstico DT
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs gap-1.5"
+                >
+                  {dtEditandoId ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Guardar Cambios y Actualizar DT
+                    </>
+                  ) : (
+                    "Guardar Diagnóstico DT"
+                  )}
                 </Button>
               </div>
             </div>

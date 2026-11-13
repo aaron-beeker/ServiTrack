@@ -1,4 +1,4 @@
-﻿export type EstadoGeneral = 
+export type EstadoGeneral = 
   | 'REGISTRADO' 
   | 'EN_DIAGNOSTICO' 
   | 'DIAGNOSTICADO' 
@@ -275,6 +275,7 @@ export interface DiagnosticoTecnicoCaso {
   } | null;
   informePdfUrl?: string | null;
   creadoEl: string;
+  actualizadoEl?: string;
 }
 
 export interface PruebasQAChecklist {

@@ -1043,6 +1043,83 @@ export const registrarDiagnosticoTecnico = async (
 };
 
 /**
+ * Actualiza o edita un Diagnóstico Técnico (DT) existente por errores de digitación o ajustes técnicos.
+ */
+export const actualizarDiagnosticoTecnico = async (
+  codigoCaso: string,
+  diagnosticoId: string,
+  params: {
+    tecnicoResponsable?: string;
+    tipoFalla?: 'HARDWARE' | 'SOFTWARE' | 'OPERATIVO';
+    hallazgos?: string; // Falla real / Causa raíz
+    diagnosticoDetallado?: string;
+    danosFisicos?: string;
+    requiereRepuestos?: boolean;
+    repuestosRequeridos?: RepuestoItem[];
+    recomendaciones?: string;
+    solucionPropuesta?: string;
+    autorModificacion?: string;
+  }
+): Promise<DiagnosticoTecnicoCaso> => {
+  const caso = await getCasoByCodigo(codigoCaso);
+  if (!caso) throw new Error(`Caso ${codigoCaso} no encontrado.`);
+
+  const ahora = new Date().toISOString();
+  const diagnosticos = [...(caso.diagnosticos || [])];
+  const dtIndex = diagnosticos.findIndex(
+    d => d.id === diagnosticoId || d.codigoDT === diagnosticoId
+  );
+  if (dtIndex === -1) {
+    throw new Error(`Diagnóstico ${diagnosticoId} no encontrado en el caso.`);
+  }
+
+  const dtAnterior = diagnosticos[dtIndex];
+  const dtActualizado: DiagnosticoTecnicoCaso = {
+    ...dtAnterior,
+    tecnicoResponsable: params.tecnicoResponsable ?? dtAnterior.tecnicoResponsable,
+    tipoFalla: params.tipoFalla ?? dtAnterior.tipoFalla,
+    hallazgos: params.hallazgos !== undefined ? params.hallazgos.trim() : dtAnterior.hallazgos,
+    diagnosticoDetallado: params.diagnosticoDetallado !== undefined ? params.diagnosticoDetallado.trim() : dtAnterior.diagnosticoDetallado,
+    danosFisicos: params.danosFisicos !== undefined ? params.danosFisicos.trim() : dtAnterior.danosFisicos,
+    requiereRepuestos: params.requiereRepuestos !== undefined ? params.requiereRepuestos : dtAnterior.requiereRepuestos,
+    repuestosRequeridos: params.repuestosRequeridos !== undefined ? params.repuestosRequeridos : dtAnterior.repuestosRequeridos,
+    recomendaciones: params.recomendaciones !== undefined ? params.recomendaciones.trim() : dtAnterior.recomendaciones,
+    solucionPropuesta: params.solucionPropuesta !== undefined ? params.solucionPropuesta.trim() : dtAnterior.solucionPropuesta,
+    actualizadoEl: ahora
+  };
+
+  diagnosticos[dtIndex] = dtActualizado;
+
+  const autor = params.autorModificacion || params.tecnicoResponsable || dtActualizado.tecnicoResponsable || 'Técnico Evaluador';
+
+  const nuevaActividad: ActividadHistorial = {
+    id: `ACT-${Date.now()}`,
+    fecha: ahora,
+    autor,
+    tipo: 'DIAGNOSTICO',
+    titulo: `Diagnóstico Técnico ${dtActualizado.codigoDT || dtActualizado.id} Modificado/Actualizado`,
+    detalle: `Ajuste en informe DT. Falla real: ${dtActualizado.hallazgos}. Dictamen: ${dtActualizado.diagnosticoDetallado}`,
+    referenciaId: dtActualizado.codigoDT || dtActualizado.id
+  };
+
+  const docRef = doc(db, COLECCION_CASOS, caso.id);
+  await updateDoc(docRef, limpiarUndefined({
+    diagnosticos,
+    historial: [nuevaActividad, ...(caso.historial || [])],
+    actualizadoEl: ahora
+  }));
+
+  try {
+    const dtSubRef = doc(db, `${COLECCION_CASOS}/${caso.id}/diagnosticos`, dtActualizado.id);
+    await setDoc(dtSubRef, limpiarUndefined(dtActualizado), { merge: true });
+  } catch (err) {
+    console.warn('Subcolección diagnosticos merge:', err);
+  }
+
+  return dtActualizado;
+};
+
+/**
  * PASO 2B (Decisión) & Transición a FASE 3:
  * Cliente o jefatura aprueba o rechaza la propuesta técnica del Diagnóstico (DT).
  * - Si Rechaza: Estado pasa a 'CERRADO_SIN_REPARACION' (emitiendo Acta de Devolución con Informe).
