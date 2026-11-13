@@ -2008,7 +2008,7 @@ export default function ExpedienteCasoPage() {
                         </div>
                       </div>
                     ) : dtActual.estado === "APROBADO" ? (
-                      <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-300 flex items-center justify-between">
+                      <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-300 flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                           <div>
@@ -2016,18 +2016,63 @@ export default function ExpedienteCasoPage() {
                             <span className="text-[11px] text-emerald-700">Listo para la ejecución de la Orden de Servicio en taller.</span>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => setActiveTab("etapa3")}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
-                        >
-                          Ir a Etapa 3: Intervención & QA →
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedDTForDecision(dtActual)
+                              setDecisionAprobado(false)
+                              setDecisionMotivoRechazo("Intervención no aprobada por el cliente")
+                              setModalDecisionDTOpen(true)
+                            }}
+                            className="text-xs border-rose-300 text-rose-700 hover:bg-rose-50"
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5 mr-1" />
+                            Cambiar a Rechazado
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => setActiveTab("etapa3")}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                          >
+                            Ir a Etapa 3: Intervención & QA →
+                          </Button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-300 text-xs text-rose-800">
-                        <span className="font-bold block">Diagnóstico Rechazado</span>
-                        <p className="mt-0.5">El cliente no aprobó la reparación. El expediente procede a liquidación o devolución sin reparación.</p>
+                      <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-300 flex items-center justify-between flex-wrap gap-3 text-xs text-rose-800">
+                        <div>
+                          <span className="font-bold text-rose-900 block">Diagnóstico Rechazado por el Cliente</span>
+                          <p className="mt-0.5 text-rose-700">
+                            {dtActual.aprobacionCliente?.motivoRechazo
+                              ? `Motivo: ${dtActual.aprobacionCliente.motivoRechazo}. `
+                              : "El cliente no aprobó la reparación. "}
+                            El expediente procede a liquidación o devolución sin reparación.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedDTForDecision(dtActual)
+                              setDecisionAprobado(true)
+                              setGenerarOSAlAprobar(true)
+                              setModoCodigoOSDecision("AUTO")
+                              setCodigoOSManualDecision("")
+                              setOsActividadesDecision(dtActual.solucionPropuesta || dtActual.recomendaciones || `Ejecución de trabajos según diagnóstico ${dtActual.codigoDT}`)
+                              setOsTipoDecision("CORRECTIVA")
+                              setOsTecnicoDecision(operadorNombre)
+                              setOsHorasDecision(2)
+                              setModalDecisionDTOpen(true)
+                            }}
+                            className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                            Reabrir / Cambiar a Aprobado
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3156,6 +3201,136 @@ export default function ExpedienteCasoPage() {
                       </Button>
                     </div>
                   </div>
+                ) : estadoNorm === "CERRADO_SIN_REPARACION" ? (
+                  /* ========================================================================= */
+                  /* CASO CERRADO SIN REPARACIÓN (PROPUESTA RECHAZADA / NO INTERVENIDO)        */
+                  /* ========================================================================= */
+                  <div className="space-y-4">
+                    {/* Tarjeta Informativa de No Intervención */}
+                    <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-300 flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-700 shrink-0">
+                          <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-amber-950 block">
+                            Expediente Cerrado Sin Reparación (No Intervenido)
+                          </span>
+                          <span className="text-[11px] text-amber-800">
+                            {caso.entrega
+                              ? `Activo devuelto al cliente por: ${caso.entrega.receptorNombre} · Sin reparación en taller.`
+                              : "La propuesta técnica fue rechazada por el cliente. El equipo no fue modificado ni reparado."}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {dtActual && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generarInformeTecnicoCasoPDF(caso, dtActual)}
+                            className="text-xs border-amber-300 text-amber-900 bg-white hover:bg-amber-50 font-semibold gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5 text-amber-700" />
+                            Informe DT ({dtActual.codigoDT})
+                          </Button>
+                        )}
+                        {!caso.entrega && (
+                          <Button
+                            size="sm"
+                            onClick={() => setModalEntregaOpen(true)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+                          >
+                            <ShieldCheck className="w-4 h-4 mr-1" />
+                            Registrar Devolución de Activo
+                          </Button>
+                        )}
+                        {caso.estado !== "CERRADO" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setModalCierreOpen(true)}
+                            className="text-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+                          >
+                            Archivar Expediente
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Constancia de Devolución del Activo (solo si ya se registró la devolución física) */}
+                    {caso.entrega ? (
+                      <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                          Constancia de Devolución de Activo (Sin Reparación)
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg">
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Receptor del Activo:</span>
+                            <strong className="text-slate-800">{caso.entrega.receptorNombre}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Documento Identidad (DNI / RUC):</span>
+                            <strong className="text-slate-800 font-mono">{caso.entrega.receptorDniRuc || "N/A"}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Fecha y Hora de Devolución:</span>
+                            <span className="text-slate-800 font-mono">
+                              {format(new Date(caso.entrega.fechaEntrega), "dd/MM/yyyy HH:mm")}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Responsable de Entrega:</span>
+                            <span className="text-slate-800">{caso.entrega.responsableEntrega || operadorNombre}</span>
+                          </div>
+                          {caso.entrega.observaciones && (
+                            <div className="sm:col-span-2 pt-1 border-t border-slate-200/60">
+                              <span className="text-slate-400 block text-[11px]">Observaciones:</span>
+                              <p className="text-slate-700 mt-0.5">{caso.entrega.observaciones}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            Devolución Física Pendiente
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            El activo permanece en custodia de taller hasta que el cliente o mensajería retire la unidad en su estado original.
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setModalEntregaOpen(true)}
+                          className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold gap-1.5 shadow-xs"
+                        >
+                          <ShieldCheck className="w-4 h-4 mr-1" />
+                          Registrar Salida / Devolución
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Cobertura de Garantía: No Aplica */}
+                    <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                        Cobertura de Garantía Técnica
+                      </span>
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <span className="font-bold text-slate-800 block">No Aplica Garantía Técnica</span>
+                          <span className="text-[11px] text-slate-500">
+                            Este equipo no cuenta con cobertura de garantía técnica debido a que la intervención fue rechazada por el cliente y no se realizaron trabajos de reparación ni reemplazo de piezas.
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-200 text-slate-700 shrink-0">
+                          0 Días / No Aplica
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   /* Ya entregado / en garantía / cerrado */
                   <div className="space-y-4">
@@ -3221,37 +3396,39 @@ export default function ExpedienteCasoPage() {
                     </div>
 
                     {/* Datos de Entrega y Conformidad */}
-                    <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                        Constancia de Entrega y Recepción
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg">
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">Receptor del Activo:</span>
-                          <strong className="text-slate-800">{caso.entrega?.receptorNombre || caso.cliente.contacto}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">Documento Identidad (DNI / RUC):</span>
-                          <strong className="text-slate-800 font-mono">{caso.entrega?.receptorDniRuc || caso.cliente.ruc}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">Fecha y Hora de Entrega:</span>
-                          <span className="text-slate-800 font-mono">
-                            {caso.entrega?.fechaEntrega ? format(new Date(caso.entrega.fechaEntrega), "dd/MM/yyyy HH:mm") : "Registrada"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">Responsable de Entrega:</span>
-                          <span className="text-slate-800">{caso.entrega?.responsableEntrega || operadorNombre}</span>
-                        </div>
-                        {caso.entrega?.observaciones && (
-                          <div className="sm:col-span-2 pt-1 border-t border-slate-200/60">
-                            <span className="text-slate-400 block text-[11px]">Observaciones:</span>
-                            <p className="text-slate-700 mt-0.5">{caso.entrega.observaciones}</p>
+                    {caso.entrega && (
+                      <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                          Constancia de Entrega y Recepción
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg">
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Receptor del Activo:</span>
+                            <strong className="text-slate-800">{caso.entrega.receptorNombre}</strong>
                           </div>
-                        )}
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Documento Identidad (DNI / RUC):</span>
+                            <strong className="text-slate-800 font-mono">{caso.entrega.receptorDniRuc || "N/A"}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Fecha y Hora de Entrega:</span>
+                            <span className="text-slate-800 font-mono">
+                              {format(new Date(caso.entrega.fechaEntrega), "dd/MM/yyyy HH:mm")}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Responsable de Entrega:</span>
+                            <span className="text-slate-800">{caso.entrega.responsableEntrega || operadorNombre}</span>
+                          </div>
+                          {caso.entrega.observaciones && (
+                            <div className="sm:col-span-2 pt-1 border-t border-slate-200/60">
+                              <span className="text-slate-400 block text-[11px]">Observaciones:</span>
+                              <p className="text-slate-700 mt-0.5">{caso.entrega.observaciones}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Gestión de Garantía & Liquidación Final */}
                     <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
@@ -3269,7 +3446,9 @@ export default function ExpedienteCasoPage() {
                       <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg">
                         <div>
                           <span className="text-slate-500">Plazo Asignado:</span>
-                          <p className="font-bold text-slate-800">{caso.garantia?.diasGarantia || 0} Días calendario</p>
+                          <p className="font-bold text-slate-800">
+                            {caso.garantia?.aplicaGarantia ? `${caso.garantia?.diasGarantia || 0} Días calendario` : "No Aplica / 0 Días"}
+                          </p>
                         </div>
                         <div>
                           <span className="text-slate-500">Reingresos Registrados:</span>
